@@ -30,10 +30,15 @@ __author__ = 'papamac'
 __version__ = '0.9.0'
 __date__ = 'April 12, 2018'
 
+from signal import signal, SIGTERM
 from threading import Thread
 
 from iomgr import IOMGR, ARGS, LOG
 from pidacs_global import *
+
+
+class Termination(Exception):
+    pass
 
 
 class Client(Thread):
@@ -42,49 +47,48 @@ class Client(Thread):
     def __init__(self, sock, sock_id):
         self.sock = sock
         self.sock_id = sock_id
-        self._running = False
+        self.running = False
         Thread.__init__(self, name='Client ' + sock_id,
                         target=self._process_client_requests)
 
     def _process_client_requests(self):
-        while self._running:
-            req = ''
+        while self.running:
             try:
-                req = recv_msg(self, self.sock)
-                if not self._running:
+                request = recv_msg(self, self.sock)
+                if not self.running:
                     break
             except OSError as err_msg:
-                error = 'recv error "%s"; client stopped' % self.sock_id
-                IOMGR.queue_message('error', error)
+                err = 'recv error "%s"; client stopped' % self.sock_id
+                IOMGR.queue_message('error', err)
                 IOMGR.queue_message('error', '%s' % err_msg)
-                self._running = False
+                self.running = False
                 break
             except BrokenPipe:
                 status = 'client disconnected "%s"' % self.sock_id
                 IOMGR.queue_message('status', status)
-                self._running = False
+                self.running = False
                 break
             dt_recvd = datetime.now()
             try:
-                dt_sent = datetime.strptime(req[:DATETIME_LENGTH],
+                dt_sent = datetime.strptime(request[:DATETIME_LENGTH],
                                             '%Y-%m-%d %H:%M:%S.%f')
             except ValueError:
-                warning = 'invalid datetime "%s" %s' % (self.sock_id, req)
-                IOMGR.queue_message('warning', warning)
+                warn = 'invalid datetime "%s" %s' % (self.sock_id, request)
+                IOMGR.queue_message('warning', warn)
                 continue
             latency = (dt_recvd - dt_sent).total_seconds()
             if latency > LATENCY_LIMIT:
-                warning = ('late request "%s" %s %5.3f'
-                           % (self.sock_id, req, latency))
-                IOMGR.queue_message('warning', warning)
-            IOMGR.process_request(req[DATETIME_LENGTH + 1:])
+                warn = ('late request "%s" %s %5.3f'
+                        % (self.sock_id, request, latency))
+                IOMGR.queue_message('warning', warn)
+            IOMGR.process_request(request[DATETIME_LENGTH + 1:])
 
     def start(self):
-        self._running = True
+        self.running = True
         Thread.start(self)
 
     def stop(self):
-        self._running = False
+        self.running = False
         self.join()
         self.sock.close()
 
@@ -93,9 +97,9 @@ class PiDACS:
     """
     """
     _clients = []
-    _running = False
     _accept = None
     _serve = None
+    _running = False
 
     @classmethod
     def _accept_connections(cls):
@@ -103,8 +107,14 @@ class PiDACS:
         srv_sock.settimeout(SOCKET_TIMEOUT)
         srv_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         address_tuple = '', int(ARGS.IP_port)
-        srv_sock.bind(address_tuple)
-        srv_sock.listen(5)
+        try:
+            srv_sock.bind(address_tuple)
+            srv_sock.listen(5)
+        except OSError as err_msg:
+            err = 'socket error; server terminated'
+            IOMGR.queue_message('error', err)
+            IOMGR.queue_message('error', '%s' % err_msg)
+            cls._running = False
         while cls._running:
             try:
                 client_sock, client_address_tuple = srv_sock.accept()
@@ -124,18 +134,18 @@ class PiDACS:
             message = IOMGR.get_message()
             if message:
                 for client in cls._clients:
-                    if client._running:
+                    if client.running:
                         try:
                             send_msg(client.sock, message)
                         except OSError as err_msg:
-                            error = ('send error "%s"; client stopped'
-                                    % client.sock_id)
-                            IOMGR.queue_message('error', error)
+                            err = ('send error "%s"; client stopped'
+                                   % client.sock_id)
+                            IOMGR.queue_message('error', err)
                             IOMGR.queue_message('error', '%s' % err_msg)
                         except BrokenPipe:
-                            error = ('broken pipe "%s"; client stopped'
-                                     % client.sock_id)
-                            IOMGR.queue_message('error', error)
+                            err = ('broken pipe "%s"; client stopped'
+                                   % client.sock_id)
+                            IOMGR.queue_message('error', err)
                         else:
                             continue
                         IOMGR.queue_message('status', 'disconnected "%s"'
@@ -153,6 +163,7 @@ class PiDACS:
         cls._serve = Thread(name='PiDACS_serve_clients',
                             target=cls._serve_clients)
         cls._serve.start()
+        signal(SIGTERM, cls.terminate)
 
     @classmethod
     def stop(cls):
@@ -163,6 +174,11 @@ class PiDACS:
         cls._serve.join()
         IOMGR.stop()
 
+    @classmethod
+    def terminate(cls, *args):
+        raise Termination
+
+
 # PiDACS main program:
 
 if __name__ == '__main__':
@@ -170,15 +186,17 @@ if __name__ == '__main__':
     if ARGS.interactive:
         LOG.info('Begin interactive session')
         LOG.info('Enter requests: channel_name request_id argument or quit')
-    while True:
-        try:
+    try:
+        while True:
             if ARGS.interactive:
                 req = input()
                 if req and 'quit'.startswith(req.lower()):
                     break
                 IOMGR.process_request(req)
-        except KeyboardInterrupt:
-            break
+    except KeyboardInterrupt:
+        pass
+    except Termination:
+        pass
     PiDACS.stop()
     if ARGS.interactive:
         LOG.info('End interactive session')

@@ -34,8 +34,8 @@ from socket import *
 
 # PiDACS message length constants:
 
-MESSAGE_LENGTH = 80         # Fixed message length for data queue and sockets
-#                             (bytes).
+MESSAGE_LENGTH = 100          # Fixed message length for data queue and sockets
+#                              (bytes).
 DATETIME_LENGTH = len(str(datetime.now()))  # Length of datetime message
 #                                             segment (bytes).
 TEXT_LENGTH = MESSAGE_LENGTH - DATETIME_LENGTH - 3  # Length of text message
@@ -73,7 +73,7 @@ class ServerTimeout(Exception):
 def recv_msg(thread, sock, dt_recvd=None):
     msg = b''
     bytes_recvd = 0
-    while thread._running and bytes_recvd < MESSAGE_LENGTH:
+    while thread.running and bytes_recvd < MESSAGE_LENGTH:
         try:
             segment = sock.recv(MESSAGE_LENGTH - bytes_recvd)
         except timeout:

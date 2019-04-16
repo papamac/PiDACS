@@ -37,11 +37,11 @@ from pidacs_global import *
 
 
 class Client:
-    _running = False
     _print = None
     _srv_addr = None
     _srv_sock = None
     _dt_recvd = None
+    running = False
 
     @classmethod
     def _connect_to_server(cls):
@@ -89,11 +89,11 @@ class Client:
     @classmethod
     def _print_server_messages(cls):
         err_msg = None
-        while cls._running:
+        while cls.running:
             message = ''
             try:
                 message = recv_msg(cls, cls._srv_sock, cls._dt_recvd)
-                if not cls._running:
+                if not cls.running:
                     continue
             except OSError as err_msg:
                 err_msg = 'Recv error "%s" %s' % (cls._srv_addr, err_msg)
@@ -117,7 +117,7 @@ class Client:
                 print('******** late message %5.3f ********' % latency)
         else:
             return
-        cls._running = False
+        cls.running = False
         print(err_msg)
         _exit(0)
 
@@ -139,14 +139,14 @@ class Client:
     def start(cls):
         cls._connect_to_server()
         cls._dt_recvd = datetime.now()
-        cls._running = True
+        cls.running = True
         cls._print = Thread(name='print_server_messages',
                             target=cls._print_server_messages)
         cls._print.start()
 
     @classmethod
     def stop(cls):
-        cls._running = False
+        cls.running = False
         cls._print.join()
         cls._srv_sock.close()
 

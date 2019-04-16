@@ -82,6 +82,60 @@ STATUS_INTERVAL = 600       # Interval for port status reporting (sec).
 # used in the IOMGR._REQUESTS dictionary to specify default values to be used
 # when a user request omits the argument.
 
+# Options and DEFAULT value for digital channel direction:
+
+INPUT = 1                   # Channel is a digital input.
+OUTPUT = 0                  # Channel is a digital output.
+DIRECTION = INPUT           # DEFAULT is INPUT
+
+# Options and DEFAULT values for pulse width modulation (PWM):
+
+DUTYCYCLE = 50              # PWM duty cycle in percent (0% - continuous off to
+#                             100% - continuous on).  DEFAULT is 50% - half on,
+#                             half off.
+FREQUENCY = 100             # Pulse frequency in Hz for PWM digital outputs.
+#                             DEFAULT is 100 Hz.
+START = 1                   # Start PWM output.
+STOP = 0                    # Stop PWM output and delete current PWM object.
+OPERATION = START           # DEFAULT is START.
+
+# Options and DEFAULT value for digital channel polarity:
+
+NORMAL = 0                  # Normal logic polarity (logic low = 0, high = 1).
+INVERTED = 1                # Inverted logic polarity (low = 1, high = 0).
+POLARITY = NORMAL           # DEFAULT is NORMAL.
+
+# Options and DEFAULT value for digital channel pullup resistor configuration.
+
+OFF = DISABLED = 0          # No internal pullup resistor on digital input.
+ON = ENABLED = UP = 1       # Digital input pulled up to logic high through an
+#                             internal resistor.
+DOWN = 2                    # Digital input pulled down to logic low through an
+#                             internal resistor.  Applicable to BCM GPIO only.
+PULLUP = DISABLED           # DEFAULT is DISABLED.
+
+# Options and DEFAULT values for analog channel configuration parameters:
+
+RESOLUTION = 12             # ADC resolution is 12, 14, 16, or 18 bits.
+#                             DEFAULT is 12 bits.
+GAIN = 1                    # ADC gain is 1, 2, 4, or 8.
+#                             DEFAULT is 1.
+SCALING = (6.8 + 10) / 6.8  # The ADC scaling factor can be any real number
+#                             providing appropriate scaling for the sensor
+#                             circuit being measured by an individual analog
+#                             channel.
+#                             DEFAULT is for 5V single ended channels on the
+#                             AB Electronics ADC Pi Plus board.
+
+# DEFAULT operational arguments for channel momentary contact and write
+# methods.  These are used in the the IOMGR._REQUESTS dictionary to specify
+# default values to be used when a user request omits the argument.
+
+MOMENTARY = 0.25            # The delay time in seconds from a momentary
+#                             channel turn-on to its subsequent turn-off.
+#                             DEFAULT is 0,25 sec.
+WRITE = OFF                 # DEFAULT is OFF.
+
 # Options and DEFAULT values for change detection and interval reporting:
 
 NONE = 0                    # No change detection or interval reporting.
@@ -104,77 +158,34 @@ TRUE = 1                    # Same as YES.
 CHANGE = 2                  # Change detection DEFAULT is enabled at 2%.
 INTERVAL = NONE             # Interval reporting DEFAULT is NONE.
 
-# Options and DEFAULT value for digital channel direction:
-
-INPUT = 1                   # Channel is a digital input.
-OUTPUT = 0                  # Channel is a digital output.
-DIRECTION = INPUT           # DEFAULT is INPUT
-
-# Options and DEFAULT value for digital channel polarity:
-
-NORMAL = 0                  # Normal logic polarity (logic low = 0, high = 1).
-INVERTED = 1                # Inverted logic polarity (low = 1, high = 0).
-POLARITY = NORMAL           # DEFAULT is NORMAL.
-
-# Options and DEFAULT value for digital channel pullup resistor configuration.
-
-DISABLED = 0                # No internal pullup resistor on digital input.
-OFF = DISABLED              # Same as DISABLED.
-ENABLED = 1                 # Digital input pulled up to logic high through an
-#                             internal resistor.
-ON = ENABLED                # Same as ENABLED.
-UP = ENABLED                # Same as ENABLED.
-DOWN = 2                    # Digital input pulled down to logic low through an
-#                             internal resistor.  Applicable to BCM GPIO only.
-PULLUP = DISABLED           # DEFAULT is DISABLED.
-
-# Options and DEFAULT values for analog channel resolution, gain and scaling
-# factor:
-
-RESOLUTION = 12             # ADC resolution is 12, 14, 16, or 18 bits.
-#                             DEFAULT is 12 bits.
-GAIN = 1                    # ADC gain is 1, 2, 4, or 8.
-#                             DEFAULT is 1.
-SCALING = (6.8 + 10) / 6.8  # The ADC scaling factor can be any real number
-#                             providing appropriate scaling for the sensor
-#                             circuit being measured by an individual analog
-#                             channel.
-#                             DEFAULT is for 5V single ended channels on the
-#                             AB Electronics ADC Pi Plus board.
-
-# DEFAULT operational arguments for channel momentary contact and write
-# methods.  These are used in the the IOMGR._REQUESTS dictionary to specify
-# default values to be used when a user request omits the argument.
-
-MOMENTARY = 0.25            # The delay time in seconds from a momentary
-#                             channel turn-on to its subsequent turn-off.
-#                             DEFAULT is 0,25 sec.
-WRITE = OFF                 # DEFAULT is OFF.
-
 # Valid request dictionary used in the IOMGR.process_request method.
 
 #           request_id      DEFAULT and optional argument values
 
 REQUESTS = {'alias':       {'*': None},
             'change':      {'DEFAULT': CHANGE, 'none': NONE, 'yes': YES,
-                            'false': FALSE, 'true': TRUE, '#': None},
+                            'false': FALSE, 'true': TRUE, '<=': 10},
             'direction':   {'DEFAULT': DIRECTION, 'input': INPUT,
                             'output': OUTPUT, '1': 1, '0': 0},
+            'dutycycle':   {'DEFAULT': DUTYCYCLE, '<=': 100},
+            'frequency':   {'DEFAULT': FREQUENCY, '<=': 1000},
             'gain':        {'DEFAULT': GAIN, '1': 1, '2': 2, '4': 4, '8': 8},
             'interval':    {'DEFAULT': INTERVAL, 'none': NONE, 'yes': YES,
-                            'false': FALSE, 'true': TRUE, '#': None},
-            'momentary':   {'DEFAULT': MOMENTARY, '#': None},
+                            'false': FALSE, 'true': TRUE, '<=': 86400},
+            'momentary':   {'DEFAULT': MOMENTARY, '<=': 5},
             'polarity':    {'DEFAULT': POLARITY, 'normal': NORMAL,
                             'inverted': INVERTED, '0': 0, '1': 1},
             'pullup':      {'DEFAULT': PULLUP, 'disabled': DISABLED,
                             'enabled': ENABLED, 'off': OFF, 'on': ON,
                             'down': DOWN, 'up': UP, '0': 0, '1': 1, '2': 2},
-            'read':        None,
+            'pwm':         {'DEFAULT': OPERATION, 'start': START,
+                            'stop': STOP, '1': 1, '0': 0},
+            'read':        {'DEFAULT': None},
             'resolution':  {'DEFAULT': RESOLUTION, '12': 12, '14': 14,
                             '16': 16, '18': 18},
-            'scaling':     {'DEFAULT': SCALING, '#': None},
+            'scaling':     {'DEFAULT': SCALING, '<=': 10},
             'write':       {'DEFAULT': WRITE, 'off': OFF, 'on': ON,
-                            'false': FALSE, 'true': TRUE, '#': None}}
+                            'false': FALSE, 'true': TRUE, '<=': 5}}
 
 
 class Port(Thread):
@@ -203,13 +214,14 @@ class Port(Thread):
     def _poll(self, now):
         for channel in self._channels:
             with channel.lock:
-                if channel._change or channel._interval:
-                    channel.read_nolock()
-                    if channel._change and self._value_changed(channel):
+                if channel.chg or channel.int:
+                    channel.prior_value = channel.value
+                    channel.value = channel.rd()
+                    if channel.chg and self._value_changed(channel):
                         IOMGR.queue_message('change', channel.name,
                                             channel.value)
                     interval = (now - channel.prior_report).total_seconds()
-                    if channel._interval and interval >= channel._interval:
+                    if channel.int and interval >= channel.int:
                         IOMGR.queue_message('value', channel.name,
                                             channel.value)
                         channel.prior_report = now
@@ -229,9 +241,9 @@ class Port(Thread):
 class BCM283X(Port):
     """
     """
-    _CHANNELS = [{17:11, 18:12, 22:15, 23:16, 24:18, 25:22, 27:13},
-                 { 5:29,  6:31, 12:32, 13:33, 16:36, 19:35, 20:38, 21:40,
-                  26:37}]
+    _CHANNELS = [{17: 11, 18: 12, 22: 15, 23: 16, 24: 18, 25: 22, 27: 13},
+                 {5:  29,  6: 31, 12: 32, 13: 33, 16: 36, 19: 35, 20: 38,
+                  21: 40, 26: 37}]
 
     def __init__(self, name):
         Port.__init__(self, name)
@@ -259,13 +271,18 @@ class BCM283X(Port):
         """
         def __init__(self, name):
             self._number = int(name[2:])
-            self._change = CHANGE
-            self._interval = INTERVAL
-            self._direction = DIRECTION
+            self._direction = INPUT  # Set to INPUT for pullup configuration;
+            #                          then set to DIRECTION (which could be
+            #                          OUTPUT.
             self._polarity = POLARITY
-            self._pullup = GPIO.PUD_OFF + PULLUP
+            self._pullup = None
+            self._dutycycle = DUTYCYCLE
+            self._frequency = FREQUENCY
+            self._pwm = None
 
             self.name = name
+            self.chg = CHANGE
+            self.int = INTERVAL
             self.prior_report = datetime.now()
             self.prior_value = None
             self.value = None
@@ -273,55 +290,16 @@ class BCM283X(Port):
 
             # Set default channel configuration and read channel value.
 
+            self.pullup(PULLUP)
             self.direction(DIRECTION)
-            self.read('')
+            self.read()
 
-        def alias(self, alias):
-            with self.lock:
-                self.name = alias
-                IOMGR.channels[self.name] = self
-
-        def change(self, change):
-            with self.lock:
-                self._change = change
-
-        def interval(self, interval):
-            with self.lock:
-                self._interval = interval
-
-        def direction(self, direction):
-            with self.lock:
-                self._direction = direction
-                GPIO.setup(self._number, self._direction, self._pullup)
-
-        def polarity(self, polarity):
-            with self.lock:
-                self._polarity = polarity
-
-        def pullup(self, pullup):
-            with self.lock:
-                if self._direction:
-                    self._pullup = GPIO.PUD_OFF + pullup
-                    GPIO.setup(self._number, self._direction, self._pullup)
-                    return
-                warning = ('channel "%s" not configured for input; request '
-                           'ignored' % self.name)
-                IOMGR.queue_message('warning', warning)
+        # Private methods:
 
         def _apply_polarity(self, bitval):
             if self._polarity:
                 bitval = 0 if bitval else 1
             return bitval
-
-        def read_nolock(self):
-            bitval = self._apply_polarity(GPIO.input(self._number))
-            self.prior_value = self.value
-            self.value = bitval
-
-        def read(self, argument):
-            with self.lock:
-                self.read_nolock()
-                IOMGR.queue_message('value', self.name, self.value)
 
         def _write(self, bitval):
             GPIO.output(self._number, self._apply_polarity(bitval))
@@ -329,26 +307,98 @@ class BCM283X(Port):
             self.value = bitval
             IOMGR.queue_message('value', self.name, self.value)
 
-        def write(self, bitval):
-            if IOMGR.check_bitval(bitval):
-                with self.lock:
-                    if not self._direction:  # Channel is an output.
-                        self._write(bitval)
-                    else:
-                        warning = ('channel "%s" not configured for output; '
-                                   'request ignored' % self.name)
-                        IOMGR.queue_message('warning', warning)
+        # Public methods:
+
+        def alias(self, alias):
+            self.name = alias
+            IOMGR.channels[self.name] = self
+
+        def change(self, change):
+            self.chg = change
+
+        def direction(self, direction):
+            self._direction = direction
+            pullup = (GPIO.PUD_OFF if self._direction is OUTPUT else
+                      self._pullup)
+            GPIO.setup(self._number, self._direction, pullup)
+
+        def dutycycle(self, dutycycle):
+            self._dutycycle = dutycycle
+            if self._pwm:
+                self._pwm.ChangeDutyCycle(self._dutycycle)
+
+        def frequency(self, frequency):
+            self._frequency = frequency
+            if self._pwm:
+                self._pwm.ChangeFrequency(self._frequency)
+
+        def interval(self, interval):
+            self.int = interval
 
         def momentary(self, delay):
-            with self.lock:
-                if not self._direction:  # Channel is an output.
-                    self._write(ON)
-                    sleep(delay)
-                    self._write(OFF)
+            if self._direction is OUTPUT:
+                self._write(ON)
+                sleep(delay)
+                self._write(OFF)
+            else:
+                warn = ('channel "%s" not configured for output; '
+                        'request ignored' % self.name)
+                IOMGR.queue_message('warning', warn)
+
+        def polarity(self, polarity):
+            self._polarity = polarity
+
+        def pullup(self, pullup):
+            if self._direction is INPUT:
+                pu = 0 if pullup is OFF else 1 if pullup is DOWN else 2
+                self._pullup = GPIO.PUD_OFF + pu
+                GPIO.setup(self._number, self._direction, self._pullup)
+                return
+            else:  # direction is OUTPUT.
+                warn = ('channel "%s" not configured for input; request '
+                        'ignored' % self.name)
+                IOMGR.queue_message('warning', warn)
+
+        def pwm(self, operation):
+            if operation is START:
+                if self._direction is OUTPUT:
+                    if self._pwm:  # Stop/delete existing pwm, if active.
+                        self._pwm.stop()
+                        del self._pwm
+                    self.chg = self.int = NONE
+                    self._pwm = GPIO.PWM(self._number, self._frequency)
+                    self._pwm.start(self._dutycycle)
+                    return
                 else:
-                    warning = ('channel "%s" not configured for output; '
-                               'request ignored' % self.name)
-                    IOMGR.queue_message('warning', warning)
+                    warn = ('channel "%s" not configured for output; '
+                            'request ignored' % self.name)
+                    IOMGR.queue_message('warning', warn)
+                    return
+            else:  # operation is STOP.
+                if self._pwm:  # Stop/delete existing pwm, if active.
+                    self._pwm.stop()
+                    del self._pwm
+                    self._pwm = None
+                    self.chg = CHANGE
+                    self.int = INTERVAL
+
+        def rd(self):
+            return self._apply_polarity(GPIO.input(self._number))
+
+        def read(self):
+            self.prior_value = self.value
+            self.value = self.rd()
+            IOMGR.queue_message('value', self.name, self.value)
+
+        def write(self, bitval):
+            if IOMGR.check_bitval(bitval):
+                if self._direction is OUTPUT:
+                    self._write(bitval)
+                else:  # direction is OUTPUT.
+                    warn = ('channel "%s" not configured for output; '
+                            'request ignored' % self.name)
+                    IOMGR.queue_message('warning', warn)
+
 
 class MCP230XX(Port):
     """
@@ -402,10 +452,10 @@ class MCP230XX(Port):
                 bitval = 1 if self._gpio.value & mask else 0
                 channel.prior_value = channel.value
                 channel.value = bitval
-                if channel._change and changes & mask:
+                if channel.chg and changes & mask:
                     IOMGR.queue_message('change', channel.name, bitval)
                 interval = (now - channel.prior_report).total_seconds()
-                if channel._interval and interval >= channel._interval:
+                if channel.int and interval >= channel.int:
                     IOMGR.queue_message('value', channel.name, bitval)
                     channel.prior_report = now
 
@@ -462,12 +512,12 @@ class MCP230XX(Port):
             self._ipol = registers['IPOL']
             self._gppu = registers['GPPU']
             self._gpio = registers['GPIO']
-            self._lock = lock
-            self._change = CHANGE
-            self._interval = INTERVAL
+            self.lock = lock
 
             self.name = name
             self.number = int(name[3])
+            self.chg = CHANGE
+            self.int = INTERVAL
             self.prior_report = datetime.now()
             self.prior_value = None
             self.value = None
@@ -477,7 +527,9 @@ class MCP230XX(Port):
             self.direction(DIRECTION)
             self.polarity(POLARITY)
             self.pullup(PULLUP)
-            self.read('')
+            self.read()
+
+        # Private method:
 
         def _write(self, bitval):
             self._gpio.update(self.number, bitval)
@@ -485,60 +537,55 @@ class MCP230XX(Port):
             self.value = bitval
             IOMGR.queue_message('value', self.name, self.value)
 
+        # Public methods:
+
         def alias(self, alias):
-            with self._lock:
-                self.name = alias
-                IOMGR.channels[self.name] = self
+            self.name = alias
+            IOMGR.channels[self.name] = self
 
         def change(self, change):
-            with self._lock:
-                self._change = change
-
-        def interval(self, interval):
-            with self._lock:
-                self._interval = interval
+            self.chg = change
 
         def direction(self, bitval):
-            with self._lock:
-                self._iodir.update(self.number, bitval)
+            self._iodir.update(self.number, bitval)
+
+        def interval(self, interval):
+            self.int = interval
+
+        def momentary(self, delay):
+            if not(self._iodir.value & (1 << self.number)):  # OUTPUT.
+                self._write(ON)
+                sleep(delay)
+                self._write(OFF)
+            else:
+                warn = ('channel "%s" not configured for output; '
+                        'request ignored' % self.name)
+                IOMGR.queue_message('warning', warn)
 
         def polarity(self, bitval):
-            with self._lock:
-                self._ipol.update(self.number, bitval)
+            self._ipol.update(self.number, bitval)
 
         def pullup(self, bitval):
             if IOMGR.check_bitval(bitval):
-                with self._lock:
-                    self._gppu.update(self.number, bitval)
+                self._gppu.update(self.number, bitval)
 
-        def read(self, argument):
-            with self._lock:
-                self._gpio.read()
-                bitval = 1 if self._gpio.value & (1 << self.number) else 0
-                self.prior_value = self.value
-                self.value = bitval
-                IOMGR.queue_message('value', self.name, self.value)
+        def rd(self):
+            self._gpio.read()
+            return 1 if self._gpio.value & (1 << self.number) else 0
+
+        def read(self):
+            self.prior_value = self.value
+            self.value = self.rd()
+            IOMGR.queue_message('value', self.name, self.value)
 
         def write(self, bitval):
             if IOMGR.check_bitval(bitval):
-                with self._lock:
-                    if not(self._iodir.value & (1 << self.number)):  # Output.
-                        self._write(bitval)
-                    else:
-                        warning = ('channel "%s" not configured for output; '
-                                   'request ignored' % self.name)
-                        IOMGR.queue_message('warning', warning)
-
-        def momentary(self, delay):
-            with self._lock:
                 if not(self._iodir.value & (1 << self.number)):  # Output.
-                    self._write(ON)
-                    sleep(delay)
-                    self._write(OFF)
+                    self._write(bitval)
                 else:
-                    warning = ('channel "%s" not configured for output; '
-                               'request ignored' % self.name)
-                    IOMGR.queue_message('warning', warning)
+                    warn = ('channel "%s" not configured for output; '
+                            'request ignored' % self.name)
+                    IOMGR.queue_message('warning', warn)
 
 
 class MCP342X(Port):
@@ -560,7 +607,7 @@ class MCP342X(Port):
         changed = False
         if pval:
             change = 100.0 * fabs(val - pval) / pval
-            changed = change > channel._change
+            changed = change > channel.chg
         return changed
 
     class _Channel:
@@ -571,8 +618,6 @@ class MCP342X(Port):
         def __init__(self, name, lock):
             self._i2c_address = self._I2C_BASE_ADDRESS + int(name[2])
             self._number = int(name[3])
-            self._change = CHANGE
-            self._interval = INTERVAL
             self._scaling = SCALING
             self._resolution = RESOLUTION
             self._gain = GAIN
@@ -580,6 +625,8 @@ class MCP342X(Port):
             self._num_bytes = None
 
             self.name = name
+            self.chg = CHANGE
+            self.int = INTERVAL
             self.prior_report = datetime.now()
             self.prior_value = None
             self.value = None
@@ -588,24 +635,9 @@ class MCP342X(Port):
             # Set default channel configuration and read channel value.
 
             self._configure()
-            self.read('')
+            self.read()
 
-        def alias(self, alias):
-            with self.lock:
-                self.name = alias
-                IOMGR.channels[self.name] = self
-
-        def change(self, change):
-            with self.lock:
-                self._change = change
-
-        def interval(self, interval):
-            with self.lock:
-                self._interval = interval
-
-        def scaling(self, scaling):
-            with self.lock:
-                self._scaling = scaling
+        # Private method:
 
         def _configure(self):
             resolution_index = int((self._resolution - 12) / 2)
@@ -614,17 +646,23 @@ class MCP342X(Port):
                             + gain_index)
             self._num_bytes = 3 if self._resolution < 18 else 4
 
-        def resolution(self, resolution):
-            with self.lock:
-                self._resolution = resolution
-                self._configure()
+        # Public methods:
+
+        def alias(self, alias):
+            self.name = alias
+            IOMGR.channels[self.name] = self
+
+        def change(self, change):
+            self.chg = change
 
         def gain(self, gain):
-            with self.lock:
-                self._gain = gain
-                self._configure()
+            self._gain = gain
+            self._configure()
 
-        def read_nolock(self):
+        def interval(self, interval):
+            self.int = interval
+
+        def rd(self):
             I2CBUS.write_byte(self._i2c_address, self._config)
             config = self._config & 0x7F
             while True:
@@ -636,13 +674,19 @@ class MCP342X(Port):
             if counts < 0:
                 counts = 0
             lsb_value = 4.096 / 2 ** self._resolution
-            self.prior_value = self.value
-            self.value = counts * lsb_value / self._gain * self._scaling
+            return counts * lsb_value / self._gain * self._scaling
 
-        def read(self, argument):
-            with self.lock:
-                self.read_nolock()
-                IOMGR.queue_message('value', self.name, self.value)
+        def read(self):
+            self.prior_value = self.value
+            self.value = self.rd()
+            IOMGR.queue_message('value', self.name, self.value)
+
+        def resolution(self, resolution):
+            self._resolution = resolution
+            self._configure()
+
+        def scaling(self, scaling):
+            self._scaling = scaling
 
 
 class MCP320X:
@@ -674,8 +718,8 @@ class IOMGR:
         Check for valid port names and instantiate/start valid ports.
         """
         if not ARGS.port_names:
-            error = 'no port port_name(s) specified; %s aborted' % NAME
-            cls.queue_message('error', error)
+            err = 'no port port_name(s) specified; %s aborted' % NAME
+            cls.queue_message('error', err)
             return
         cls.queue_message('status', 'initializing ports %s' % ARGS.port_names)
         port_names = ARGS.port_names.lower().split()
@@ -700,9 +744,9 @@ class IOMGR:
                         if port_type in ('gg', 'gp'):
                             cls._gpio_cleanup = True
                         continue
-            warning = ('invalid or duplicate port name "%s"; '
-                       'port not started' % port_name)
-            cls.queue_message('warning', warning)
+            warn = ('invalid or duplicate port name "%s"; port not started'
+                    % port_name)
+            cls.queue_message('warning', warn)
 
     @classmethod
     def stop(cls):
@@ -715,8 +759,8 @@ class IOMGR:
     def check_bitval(cls, bitval):
         if bitval in (0, 1):
             return True
-        warning = 'invalid bit value argument "%s"; request ignored' % bitval
-        cls.queue_message('warning', warning)
+        warn = 'invalid argument "%s"; request ignored' % bitval
+        cls.queue_message('warning', warn)
         return False
 
     @staticmethod
@@ -791,7 +835,7 @@ class IOMGR:
             data = data + ' ' + str(arg)
         cls._queue.put(data.ljust(MESSAGE_LENGTH).encode()[:MESSAGE_LENGTH])
         level = (eval(message_id.upper())
-                 if message_id in ('debug', 'warning', 'error') else INFO)
+                 if message_id in ('warning', 'error') else INFO)
         LOG.log(level, data[27:])
 
     @classmethod
@@ -805,19 +849,21 @@ class IOMGR:
         nsplit = len(request_split)
 
         if nsplit < 2:
-            warning = 'invalid syntax; request ignored'
-            cls.queue_message('warning', warning)
+            warn = 'invalid syntax; request ignored'
+            cls.queue_message('warning', warn)
             return
 
         channel_name = request_split[0]
         if channel_name in cls.channels:
             channel = cls.channels[channel_name]
         else:
-            warning = 'channel "%s" not found; request ignored' % channel_name
-            cls.queue_message('warning', warning)
+            warn = 'channel "%s" not found; request ignored' % channel_name
+            cls.queue_message('warning', warn)
             return
 
         request_id = request_split[1]
+        if request_id == 'd':
+            request_id = 'di'
         if request_id == 'r':
             request_id = 'rea'
         for req_id in REQUESTS:
@@ -825,8 +871,8 @@ class IOMGR:
                 request_id = req_id
                 break
         else:
-            warning = 'invalid request id "%s"; request ignored' % request_id
-            cls.queue_message('warning', warning)
+            warn = 'invalid request id "%s"; request ignored' % request_id
+            cls.queue_message('warning', warn)
             return
 
         argument = request_split[2] if nsplit == 3 else 'DEFAULT'
@@ -837,29 +883,29 @@ class IOMGR:
                     break
                 elif arg == '*' and argument != 'DEFAULT':
                     break
-                elif arg == '#'and argument.replace('.', '', 1).isdecimal():
+                elif arg == '<='and argument.replace('.', '', 1).isdecimal():
                     if argument.isdecimal():
                         argument = int(argument)
                     else:
                         argument = float(argument)
-                    break
+                    if argument <= REQUESTS[request_id][arg]:
+                        break
             else:
-                warning = 'invalid argument "%s"; request ignored' % argument
-                cls.queue_message('warning', warning)
+                warn = 'invalid argument "%s"; request ignored' % argument
+                cls.queue_message('warning', warn)
                 return
 
         # Valid request; invoke channel methods to process the request.
 
-        debug = 'equivalent method call is %s.%s(%s)'\
-                % (channel.name, request_id, argument)
-        LOG.debug(debug)
         method = getattr(channel, request_id, None)
-        if hasattr(method, '__call__'):
-            method(argument)
+        if method:
+            with channel.lock:
+                method() if argument is None else method(argument)
         else:
-            warning = ('request id "%s" is not valid for channel %s; '
-                       'request ignored' % (request_id, channel.name))
-            cls.queue_message('warning', warning)
+            warn = ('request id "%s" is not valid for channel %s; '
+                    'request ignored' % (request_id, channel.name))
+            cls.queue_message('warning', warn)
+
 
 # Define the global variables NAME, ARGS, and LOG when the iomgr module is
 # loaded.  This enables the global variables to be used both in iomgr.py and
@@ -877,15 +923,15 @@ if __name__ == '__main__':
     if ARGS.interactive:
         LOG.info('Begin interactive session')
         LOG.info('Enter requests: channel_name request_id argument or quit')
-    while True:
-        try:
+    try:
+        while True:
             if ARGS.interactive:
                 req = input()
                 if req and 'quit'.startswith(req.lower()):
                     break
                 IOMGR.process_request(req)
-        except KeyboardInterrupt:
-            break
+    except KeyboardInterrupt:
+        pass
     IOMGR.stop()
     if ARGS.interactive:
         LOG.info('End interactive session')
