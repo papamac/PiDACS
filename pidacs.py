@@ -33,55 +33,23 @@ __date__ = 'April 12, 2018'
 from signal import signal, SIGTERM
 from threading import Thread
 
-from iomgr import IOMGR, ARGS, LOG
+from iomgr import IOMGR, NAME, ARGS, LOG
+from nbi import NBI
 from pidacs_global import *
-
-
-class Termination(Exception):
-    pass
 
 
 class Client(Thread):
     """
     """
-    def __init__(self, sock, sock_id):
-        self.sock = sock
-        self.sock_id = sock_id
-        self.running = False
-        Thread.__init__(self, name='Client ' + sock_id,
-                        target=self._process_client_requests)
+    clients = []
 
-    def _process_client_requests(self):
-        while self.running:
-            try:
-                request = recv_msg(self, self.sock)
-                if not self.running:
-                    break
-            except OSError as err_msg:
-                err = 'recv error "%s"; client stopped' % self.sock_id
-                IOMGR.queue_message('error', err)
-                IOMGR.queue_message('error', '%s' % err_msg)
-                self.running = False
-                break
-            except BrokenPipe:
-                status = 'client disconnected "%s"' % self.sock_id
-                IOMGR.queue_message('status', status)
-                self.running = False
-                break
-            dt_recvd = datetime.now()
-            try:
-                dt_sent = datetime.strptime(request[:DATETIME_LENGTH],
-                                            '%Y-%m-%d %H:%M:%S.%f')
-            except ValueError:
-                warn = 'invalid datetime "%s" %s' % (self.sock_id, request)
-                IOMGR.queue_message('warning', warn)
-                continue
-            latency = (dt_recvd - dt_sent).total_seconds()
-            if latency > LATENCY_LIMIT:
-                warn = ('late request "%s" %s %5.3f'
-                        % (self.sock_id, request, latency))
-                IOMGR.queue_message('warning', warn)
-            IOMGR.process_request(request[DATETIME_LENGTH + 1:])
+    def __init__(self, sock, socket_id):
+        self.socket = sock
+        self.socket_id = socket_id
+        self.running = False
+        Thread.__init__(self, name='Client ' + socket_id,
+                        target=self._process_client_requests)
+        self.clients.append(self)
 
     def start(self):
         self.running = True
@@ -90,113 +58,165 @@ class Client(Thread):
     def stop(self):
         self.running = False
         self.join()
-        self.sock.close()
+        self.socket.close()
+
+    def _process_client_requests(self):
+        while self.running:
+            try:
+                request = recv_msg(self, self.socket)
+                if not self.running:
+                    continue
+            except OSError as err:
+                err_msg = 'recv error "%s"; client stopped' % self.socket_id
+                IOMGR.queue_message('ERROR', err_msg)
+                IOMGR.queue_message('ERROR', '%s' % err)
+                break
+            except BrokenPipe:
+                status = 'client disconnected "%s"' % self.socket_id
+                IOMGR.queue_message('status', status)
+                break
+            dt_recvd = datetime.now()
+            requestdt = request[:DATETIME_LENGTH]
+            try:
+                dt_sent = datetime.strptime(requestdt, '%Y-%m-%d %H:%M:%S.%f')
+            except ValueError:
+                warn = ('request has invalid datetime "%s" %s'
+                        % (self.socket_id, requestdt))
+                IOMGR.queue_message('WARNING', warn)
+                continue
+            latency = (dt_recvd - dt_sent).total_seconds()
+            if latency > LATENCY:
+                warn = ('late request "%s"; latency = %3.1f sec'
+                        % (self.socket_id, latency))
+                IOMGR.queue_message('WARNING', warn)
+            IOMGR.process_request(request[DATETIME_LENGTH + 1:])
+        else:
+            return
+        self.running = False
 
 
 class PiDACS:
     """
     """
-    _clients = []
+    running = False
+    _socket = None
     _accept = None
     _serve = None
-    _running = False
+
+    @classmethod
+    def start(cls):
+
+        # Open server socket to listen for client connections.
+
+        cls._socket = socket(AF_INET, SOCK_STREAM)
+        cls._socket.settimeout(SOCKET_TIMEOUT)
+        cls._socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+        port_number = ARGS.IP_port
+        if port_number.isnumeric():
+            port_number = int(port_number)
+            if port_number not in DYNAMIC_PORT_RANGE:
+                LOG.warn('port number not in dynamic port range "%s"; '
+                         'default used' % port_number)
+                port_number = DEFAULT_PORT_NUMBER
+        else:
+            LOG.warn('port number is not an integer "%s"; default used'
+                     % port_number)
+            port_number = DEFAULT_PORT_NUMBER
+        address_tuple = '', port_number
+        try:
+            cls._socket.bind(address_tuple)
+            cls._socket.listen(5)
+        except OSError as err:
+            LOG.error('socket error; %s server terminated' % NAME)
+            LOG.error(err)
+            return
+
+        # Start it all up.
+
+        IOMGR.start()
+        if IOMGR.running:
+            cls._accept = Thread(name='PiDACS_accept_connections',
+                                 target=cls._accept_connections)
+            cls._serve = Thread(name='PiDACS_serve_clients',
+                                target=cls._serve_clients)
+            cls.running = True
+            cls._accept.start()
+            cls._serve.start()
+            signal(SIGTERM, cls.terminate)
+
+    @classmethod
+    def stop(cls):
+        if IOMGR.running:
+            for client in Client.clients:
+                client.stop()
+            cls._accept.join()
+            cls._serve.join()
+            IOMGR.stop()
+
+    @classmethod
+    def terminate(cls, *args):
+        cls.running = False
 
     @classmethod
     def _accept_connections(cls):
-        srv_sock = socket(AF_INET, SOCK_STREAM)
-        srv_sock.settimeout(SOCKET_TIMEOUT)
-        srv_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        address_tuple = '', int(ARGS.IP_port)
-        try:
-            srv_sock.bind(address_tuple)
-            srv_sock.listen(5)
-        except OSError as err_msg:
-            err = 'socket error; server terminated'
-            IOMGR.queue_message('error', err)
-            IOMGR.queue_message('error', '%s' % err_msg)
-            cls._running = False
-        while cls._running:
+        while cls.running:
             try:
-                client_sock, client_address_tuple = srv_sock.accept()
+                client_socket, client_address_tuple = cls._socket.accept()
             except timeout:
                 continue
-            client_sock_id = '%s:%i' % client_address_tuple
-            status = 'client connected "%s"' % client_sock_id
+            client_socket_id = '%s:%i' % client_address_tuple
+            status = 'client connected "%s"' % client_socket_id
             IOMGR.queue_message('status', status)
-            client_sock.settimeout(SOCKET_TIMEOUT)
-            client = Client(client_sock, client_sock_id)
-            cls._clients.append(client)
+            client_socket.settimeout(SOCKET_TIMEOUT)
+            client = Client(client_socket, client_socket_id)
             client.start()
 
     @classmethod
     def _serve_clients(cls):
-        while cls._running:
+        while cls.running:
             message = IOMGR.get_message()
             if message:
-                for client in cls._clients:
+                for client in Client.clients:
                     if client.running:
                         try:
-                            send_msg(client.sock, message)
-                        except OSError as err_msg:
-                            err = ('send error "%s"; client stopped'
-                                   % client.sock_id)
-                            IOMGR.queue_message('error', err)
-                            IOMGR.queue_message('error', '%s' % err_msg)
+                            send_msg(client.socket, message)
+                        except OSError as err:
+                            err_msg = ('send error "%s"; client stopped'
+                                       % client.socket_id)
+                            IOMGR.queue_message('ERROR', err_msg)
+                            IOMGR.queue_message('ERROR', '%s' % err)
                         except BrokenPipe:
-                            err = ('broken pipe "%s"; client stopped'
-                                   % client.sock_id)
-                            IOMGR.queue_message('error', err)
+                            err_msg = ('broken pipe "%s"; client stopped'
+                                       % client.socket_id)
+                            IOMGR.queue_message('ERROR', err_msg)
                         else:
                             continue
-                        IOMGR.queue_message('status', 'disconnected "%s"'
-                                            % client.sock_id)
-                        client.stop()
-                        cls._clients.remove(client)
-
-    @classmethod
-    def start(cls):
-        IOMGR.start()
-        cls._running = True
-        cls._accept = Thread(name='PiDACS_accept_connections',
-                             target=cls._accept_connections)
-        cls._accept.start()
-        cls._serve = Thread(name='PiDACS_serve_clients',
-                            target=cls._serve_clients)
-        cls._serve.start()
-        signal(SIGTERM, cls.terminate)
-
-    @classmethod
-    def stop(cls):
-        cls._running = False
-        for client in cls._clients:
-            client.stop()
-        cls._accept.join()
-        cls._serve.join()
-        IOMGR.stop()
-
-    @classmethod
-    def terminate(cls, *args):
-        raise Termination
+                        client.running = False
 
 
 # PiDACS main program:
 
 if __name__ == '__main__':
     PiDACS.start()
-    if ARGS.interactive:
-        LOG.info('Begin interactive session')
+    interactive = ARGS.interactive and PiDACS.running
+    if interactive:
+        NBI.start()
+        LOG.info('Begin Interactive Session')
         LOG.info('Enter requests: channel_name request_id argument or quit')
     try:
-        while True:
-            if ARGS.interactive:
-                req = input()
-                if req and 'quit'.startswith(req.lower()):
-                    break
-                IOMGR.process_request(req)
+        while PiDACS.running:
+            if interactive:
+                user_request = NBI.get_input()
+                if user_request is None:
+                    continue
+                if user_request and 'quit'.startswith(user_request.lower()):
+                    PiDACS.running = False
+                    continue
+                IOMGR.process_request(user_request)
+            else:
+                continue
     except KeyboardInterrupt:
-        pass
-    except Termination:
-        pass
+        PiDACS.running = False
     PiDACS.stop()
-    if ARGS.interactive:
-        LOG.info('End interactive session')
+    if interactive:
+        LOG.info('End Interactive Session')
