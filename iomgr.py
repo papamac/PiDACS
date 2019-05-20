@@ -187,6 +187,8 @@ REQUESTS = {'alias':       {'*': None},
             'write':       {'DEFAULT': WRITE, 'off': OFF, 'on': ON,
                             'false': FALSE, 'true': TRUE, '<=': 5}}
 
+DEFAULT_PORT_NAMES = 'gg0 gg1'
+
 
 class Port(Thread):
     """
@@ -704,12 +706,19 @@ class IOMGR:
         """
         Check for valid port names and instantiate/start valid ports.
         """
-        if not ARGS.port_names:
-            err = 'no port name(s) in command line; %s terminated' % NAME
-            cls.queue_message('ERROR', err)
-            return
-        cls.queue_message('status', 'initializing ports %s' % ARGS.port_names)
-        port_names = ARGS.port_names.replace(',', ' ').lower().split()
+        port_names = ARGS.port_names
+        if not port_names:
+            try:
+                pnfile = open('/usr/local/etc/pidacs/port_names', 'r')
+                port_names = pnfile.read()
+                pnfile.close()
+            except OSError:
+                warn = ('no port name(s) in command line or port_names file; '
+                        'defaults used')
+                cls.queue_message('WARNING', warn)
+                port_names = DEFAULT_PORT_NAMES
+        cls.queue_message('status', 'initializing ports %s' % port_names)
+        port_names = port_names.replace(',', ' ').lower().split()
         for port_name in port_names:
             if len(port_name) == 3 and port_name[2].isdecimal():
                 port_type = port_name[:2]
@@ -753,7 +762,7 @@ class IOMGR:
         programs using the IOMGR class.
         """
         parser = ArgumentParser()
-        parser.add_argument('port_names', nargs='?', default='gg0 gg1',
+        parser.add_argument('port_names', nargs='?', default='',
                             help='string of port names to be processed')
         parser.add_argument('-i', '--interactive', action='store_true',
                             help='run in interactive mode from a terminal')
@@ -788,7 +797,7 @@ class IOMGR:
 
         if args.log:
             log_name = name.lower()
-            filename = '/var/log/%s/%s.log' % (log_name, log_name)
+            filename = '/var/local/log/%s/%s.log' % (log_name, log_name)
             try:
                 log_handler = TimedRotatingFileHandler(filename,
                                                        when='midnight')
