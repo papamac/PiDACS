@@ -1,0 +1,28 @@
+#!/bin/sh
+
+# Raspberry Pi data acquisition and Control System (PiDACS)
+
+# PiDACS server daemon script (pidacsd).
+
+### BEGIN INIT INFO
+# Provides:           PiDACS server
+# Required-Start:     $local_fs $syslog $network
+# Required-Stop:      $local_fs $syslog $network
+# Default-Start:      2 3 4 5
+# Default-Stop:       0 1 6
+# Short-Description:  PiDACS server
+# Description:        PiDACS server
+### END INIT INFO
+
+case "$1" in
+    start)
+        start-stop-daemon -Sbx /usr/local/bin/pidacs -- -l
+        ;;
+    stop)
+        start-stop-daemon -Kn pidacs
+        ;;
+    *)
+        echo 'Usage sudo /etc/init.d/pidacsd {start|stop}'
+        exit 1
+        ;;
+esac

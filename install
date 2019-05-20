@@ -1,0 +1,87 @@
+#!/bin/sh
+set -o xtrace
+
+# Raspberry Pi Data Acquisition and Control System (PiDACS)
+
+# Instal PiDACS components, including:
+
+# iomgr.py  - input/output manager for Raspberry Pi analog/digital I/O.
+# pidacs.py - PiDACS server, including both a local interactive mode and
+#             remote access over a network.
+# pic.py    - PiDACS interactive client (pic) providing interactive access to
+#             pidacs.py services from a remote Raspberry Pi.
+# iomgr     - executable link to iomgr.py.
+# pic       - executable link to pic.py.
+# pidacs    - executable link to pidacs.py.
+# pidacsd   - bash script to start/stop pidacs.py as a daemon.
+
+# The install script has a single argument ($1).  If omitted, the script
+# installs all source files, executable links, and logging directories, but
+# does not install, link, or start the server daemon (pidacsd).  PiDACS
+# components must be executed from a terminal command line.
+
+# If the argument is specified, script will install the daemon script, create
+# a port_names file from the contents of the argument, link the daemon for
+# automatic startup on reboot, and start the daemon in the current boot
+# session.  The argument must be a string of three-character I/O port names
+# separated by spaces, e.g., 'ga0 gb0, gg0 gg1'.  This string is written to
+# /usr/local/etc/pidacs/port_names and is used by the server daemon in lieu of
+# the port_names argument normally provided in a pidacs command line.
+
+# The install script must be executed from the same directory as the PiDACS
+# source and script files.  Usage is as follows:
+
+# ./install                   - Install only files and directories; do not
+#                               install the server daemon or execute it.
+# ./install 'ga0 gb0 gg0 gg1' - Install files, directories and the server
+#                               daemon; link the daemon for automatic startup,
+#                               and start the daemon for the specified ports.
+
+# The install script can be run multiple times without an interveneing
+# uninstall.  It simply overwrites previously installed files.
+
+mkdirx ()  # Create a new directory if none exists.
+{
+    dir=$1
+    if [ ! -d $dir ]; then
+        sudo mkdir -p $dir
+    fi
+}
+
+port_names=$1
+usr=/usr/local
+bin=${usr}/bin
+etc=${usr}/etc/pidacs
+src=${usr}/src/pidacs
+log=/var/local/log
+
+# Copy source files and create executable links.
+
+mkdirx $src
+sudo cp *.py $src
+sudo chmod +x ${src}/iomgr.py ${src}/pic.py ${src}/pidacs.py
+sudo ln -fs ${src}/iomgr.py ${bin}/iomgr
+sudo ln -fs ${src}/pic.py ${bin}/pic
+sudo ln -fs ${src}/pidacs.py ${bin}/pidacs
+
+# Create logging directories.
+
+mkdirx ${log}/iomgr
+mkdirx ${log}/pidacs
+
+# Install and start server daemon if argument is not null.
+
+if [ "$port_names" ]; then
+
+    # Copy daemon script and create port_names.
+
+    sudo cp pidacsd /etc/init.d
+    mkdirx $etc
+    echo $port_names > port_names
+    sudo mv port_names $etc
+
+    # Link the pidacs daemon script and start it.
+
+    sudo update-rc.d pidacsd defaults
+    sudo /etc/init.d/pidacsd start
+fi

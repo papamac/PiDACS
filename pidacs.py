@@ -33,7 +33,7 @@ __date__ = 'April 12, 2018'
 from signal import signal, SIGTERM
 from threading import Thread
 
-from iomgr import IOMGR, NAME, ARGS, LOG
+from iomgr import IOMGR
 from nbi import NBI
 from pidacs_global import *
 
@@ -105,30 +105,31 @@ class PiDACS:
 
     @classmethod
     def start(cls):
+        IOMGR.init()
 
         # Open server socket to listen for client connections.
 
         cls._socket = socket(AF_INET, SOCK_STREAM)
         cls._socket.settimeout(SOCKET_TIMEOUT)
         cls._socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        port_number = ARGS.IP_port
+        port_number = IOMGR.args.IP_port
         if port_number.isnumeric():
             port_number = int(port_number)
             if port_number not in DYNAMIC_PORT_RANGE:
-                LOG.warn('port number not in dynamic port range "%s"; '
-                         'default used' % port_number)
+                IOMGR.log.warn('port number not in dynamic port range "%s"; '
+                               'default used' % port_number)
                 port_number = DEFAULT_PORT_NUMBER
         else:
-            LOG.warn('port number is not an integer "%s"; default used'
-                     % port_number)
+            IOMGR.log.warn('port number is not an integer "%s"; default used'
+                           % port_number)
             port_number = DEFAULT_PORT_NUMBER
         address_tuple = '', port_number
         try:
             cls._socket.bind(address_tuple)
             cls._socket.listen(5)
         except OSError as err:
-            LOG.error('socket error; %s server terminated' % NAME)
-            LOG.error(err)
+            IOMGR.log.error('socket error; %s server terminated' % IOMGR.name)
+            IOMGR.log.error(err)
             return
 
         # Start it all up.
@@ -198,11 +199,12 @@ class PiDACS:
 
 if __name__ == '__main__':
     PiDACS.start()
-    interactive = ARGS.interactive and PiDACS.running
+    interactive = IOMGR.args.interactive and PiDACS.running
     if interactive:
         NBI.start()
-        LOG.info('Begin Interactive Session')
-        LOG.info('Enter requests: channel_name request_id argument or quit')
+        IOMGR.log.info('Begin Interactive Session')
+        IOMGR.log.info('Enter requests: channel_name request_id argument '
+                       'or quit')
     try:
         while PiDACS.running:
             if interactive:
@@ -219,4 +221,4 @@ if __name__ == '__main__':
         PiDACS.running = False
     PiDACS.stop()
     if interactive:
-        LOG.info('End Interactive Session')
+        IOMGR.log.info('End Interactive Session')

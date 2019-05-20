@@ -61,6 +61,7 @@ from logging import Formatter, getLogger, StreamHandler
 from logging.handlers import TimedRotatingFileHandler
 from math import fabs, log2
 from queue import *
+from sys import argv
 from threading import Thread, Lock
 from time import sleep
 
@@ -72,6 +73,7 @@ import RPi.GPIO as GPIO
 
 # Module iomgr global constants:
 
+DEFAULT_PORT_NAMES = 'gg0 gg1'  # ports for Raspberry Pi built-in GPIO.
 STATUS_INTERVAL = 600       # Interval for port status reporting (sec).
 
 # Channel configuration constants are used to specify the operational
@@ -204,8 +206,9 @@ class Port(Thread):
         Thread.start(self)
 
     def stop(self):
-        self._running = False
-        self.join()
+        if self._running:
+            self._running = False
+            self.join()
 
     def _polling_and_status(self):
         poll_count = 0
@@ -698,18 +701,29 @@ class IOMGR:
     _queue = Queue()
     _gpio_cleanup = False
     running = False
+    name = None
+    args = None
+    log = None
 
     @classmethod
     def start(cls):
         """
         Check for valid port names and instantiate/start valid ports.
         """
-        if not ARGS.port_names:
-            err = 'no port name(s) in command line; %s terminated' % NAME
-            cls.queue_message('ERROR', err)
-            return
-        cls.queue_message('status', 'initializing ports %s' % ARGS.port_names)
-        port_names = ARGS.port_names.replace(',', ' ').lower().split()
+        port_names = cls.args.port_names
+        if not port_names:
+            try:
+                pnfile = open('/usr/local/etc/pidacs/port_names', 'r')
+                port_names = pnfile.read().rstrip()
+                pnfile.close()
+            except OSError:
+                warn = ('no port name(s) in command line or port_names file; '
+                        'defaults used')
+                cls.queue_message('WARNING', warn)
+                port_names = DEFAULT_PORT_NAMES
+        port_names = port_names.replace(',', '').lower()
+        cls.log.info('Starting %s using port(s) %s' % (cls.name, port_names))
+        port_names = port_names.split()
         for port_name in port_names:
             if len(port_name) == 3 and port_name[2].isdecimal():
                 port_type = port_name[:2]
@@ -725,8 +739,16 @@ class IOMGR:
                         if port.name in (port_name, alt_port_name):
                             break
                     else:
-                        port = cls._PORTS[port_type][1](port_name)
-                        port.start()
+                        cls.queue_message('status', 'starting port "%s"'
+                                          % port_name)
+                        try:
+                            port = cls._PORTS[port_type][1](port_name)
+                            port.start()
+                        except OSError as err:
+                            err_msg = ('I/O error on port "%s"; startup '
+                                       'aborted' % port_name)
+                            cls.queue_message('ERROR', err_msg)
+                            cls.queue_message('ERROR', '%s' % err)
                         if port_type in ('gg', 'gp'):
                             cls._gpio_cleanup = True
                         continue
@@ -736,7 +758,7 @@ class IOMGR:
         if Port.ports:
             cls.running = True
         else:
-            err = 'no port(s) started; %s terminated' % NAME
+            err = 'no port(s) started; %s terminated' % cls.name
             cls.queue_message('ERROR', err)
 
     @classmethod
@@ -746,14 +768,14 @@ class IOMGR:
         if cls._gpio_cleanup:
             GPIO.cleanup()
 
-    @staticmethod
-    def init():
+    @classmethod
+    def init(cls):
         """
         Parse command line arguments and initialize printing/logging for main
         programs using the IOMGR class.
         """
         parser = ArgumentParser()
-        parser.add_argument('port_names', nargs='?', default='gg0 gg1',
+        parser.add_argument('port_names', nargs='?',
                             help='string of port names to be processed')
         parser.add_argument('-i', '--interactive', action='store_true',
                             help='run in interactive mode from a terminal')
@@ -773,37 +795,42 @@ class IOMGR:
                             choices=['DEBUG', 'INFO', 'WARNING', 'ERROR',
                                      'CRITICAL'],
                             help='logging level for optional printing')
-        name = parser.prog.replace('.py', '')
-        args = parser.parse_args()
+        cls.name = parser.prog.replace('.py', '')
+        cls.args = parser.parse_args()
 
-        log = getLogger(name)
-        log.setLevel(DEBUG)
+        cls.log = getLogger(cls.name)
+        cls.log.setLevel(DEBUG)
 
-        if args.print:
+        if cls.args.print:
             print_handler = StreamHandler()
-            print_handler.setLevel(args.print_level)
+            print_handler.setLevel(cls.args.print_level)
             print_formatter = Formatter('%(message)s')
             print_handler.setFormatter(print_formatter)
-            log.addHandler(print_handler)
+            cls.log.addHandler(print_handler)
+            argstr = ''
+            for arg in argv[1:]:
+                argstr = argstr + arg + ' '
+            cls.log.info('Initializing %s with options %s'
+                         % (cls.name, argstr))
 
-        if args.log:
-            log_name = name.lower()
-            filename = '/var/log/%s/%s.log' % (log_name, log_name)
+        if cls.args.log:
+            log_name = cls.name.lower()
+            filename = '/var/local/log/%s/%s.log' % (log_name, log_name)
             try:
                 log_handler = TimedRotatingFileHandler(filename,
                                                        when='midnight')
             except OSError as err:
-                log.error('error in opening "%s"; log option ignored'
-                          % filename)
-                log.error(err)
-                return name, args, log
+                err_msg = ('error in opening "%s"; log option ignored'
+                           % filename)
+                cls.queue_message('ERROR', err_msg)
+                cls.queue_message('ERROR', err)
+                return
             else:
-                log_handler.setLevel(args.log_level)
+                log_handler.setLevel(cls.args.log_level)
                 log_formatter = Formatter(
                     '%(asctime)s %(levelname)s %(message)s')
                 log_handler.setFormatter(log_formatter)
-                log.addHandler(log_handler)
-        return name, args, log
+                cls.log.addHandler(log_handler)
 
     @classmethod
     def get_message(cls):
@@ -821,7 +848,7 @@ class IOMGR:
         cls._queue.put(message.ljust(MESSAGE_LENGTH).encode()[:MESSAGE_LENGTH])
         level = (eval(message_id)
                  if message_id in ('WARNING', 'ERROR') else INFO)
-        LOG.log(level, message[DATETIME_LENGTH + 1:])
+        cls.log.log(level, message[DATETIME_LENGTH + 1:])
 
     @classmethod
     def process_request(cls, request):
@@ -898,24 +925,17 @@ class IOMGR:
                     setattr(channel, request_id, argument)
 
 
-# Define the global variables NAME, ARGS, and LOG when the iomgr module is
-# loaded.  This enables the global variables to be used both in iomgr.py and in
-# other modules.  Use in other modules requires the following import statement
-# in the using module:
-
-# from iomgr import ARGS, LOG
-
-NAME, ARGS, LOG = IOMGR.init()
-
 # IOMGR main program:
 
 if __name__ == '__main__':
+    IOMGR.init()
     IOMGR.start()
-    interactive = ARGS.interactive and IOMGR.running
+    interactive = IOMGR.args.interactive and IOMGR.running
     if interactive:
         NBI.start()
-        LOG.info('Begin Interactive Session')
-        LOG.info('Enter requests: channel_name request_id argument or quit')
+        IOMGR.log.info('Begin Interactive Session')
+        IOMGR.log.info('Enter requests: channel_name request_id argument '
+                       'or quit')
     try:
         while IOMGR.running:
             if interactive:
@@ -930,4 +950,4 @@ if __name__ == '__main__':
         pass
     IOMGR.stop()
     if interactive:
-        LOG.info('End Interactive Session')
+        IOMGR.log.info('End Interactive Session')
