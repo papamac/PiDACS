@@ -166,7 +166,7 @@ INTERVAL = NONE             # Interval reporting DEFAULT is NONE.
 
 REQUESTS = {'alias':       {'*': None},
             'change':      {'DEFAULT': CHANGE, 'none': NONE, 'yes': YES,
-                            'false': FALSE, 'true': TRUE, '<=': 10},
+                            'false': FALSE, 'true': TRUE, '#': None},
             'direction':   {'DEFAULT': DIRECTION, 'input': INPUT,
                             'output': OUTPUT, '1': 1, '0': 0},
             'dutycycle':   {'DEFAULT': DUTYCYCLE, '<=': 100},
@@ -185,7 +185,7 @@ REQUESTS = {'alias':       {'*': None},
             'read':        {'DEFAULT': None},
             'resolution':  {'DEFAULT': RESOLUTION, '12': 12, '14': 14,
                             '16': 16, '18': 18},
-            'scaling':     {'DEFAULT': SCALING, '<=': 10},
+            'scaling':     {'DEFAULT': SCALING, '#': None},
             'write':       {'DEFAULT': WRITE, 'off': OFF, 'on': ON,
                             'false': FALSE, 'true': TRUE, '<=': 5}}
 
@@ -229,8 +229,17 @@ class Port(Thread):
         for channel in self._channels:
             with channel.lock:
                 if channel.change or channel.interval:
+                    try:
+                        value = channel.read_hw()
+                    except OSError as err:
+                        self._running = False
+                        err_msg = ('polling read error on channel "%s"; port '
+                                   '"%s" stopped' % (channel.id, self.name))
+                        IOMGR.queue_message('ERROR', err_msg)
+                        IOMGR.queue_message('ERROR', err)
+                        value = '!ERROR'
                     channel.prior_value = channel.value
-                    channel.value = channel.read_hw()
+                    channel.value = value
                     if channel.change and self._value_changed(channel):
                         IOMGR.queue_message('change', channel.id,
                                             channel.value)
@@ -270,7 +279,7 @@ class Channel:
 
     def alias(self, alias):
         self._alias = alias
-        self.id = '%s|%s' % (alias, self._name)
+        self.id = '%s[%s]' % (alias, self._name)
         self.channels[alias] = self
 
     def read(self):
@@ -303,17 +312,16 @@ class Channel:
         return ok
 
     def _momentary(self, delay):
-        self._write(ON)
-        sleep(delay)
-        self._write(OFF)
-
-    def _write(self, bitval):
         if self._check_direction(OUTPUT):
-            if self._check_bitval(bitval):
-                self._write_hw(bitval)
-                self.prior_value = self.value
-                self.value = bitval
-                IOMGR.queue_message('value', self.id, bitval)
+            self._write(ON)
+            sleep(delay)
+            self._write(OFF)
+
+    def _write(self, value):
+        self._write_hw(value)
+        self.prior_value = self.value
+        self.value = value
+        IOMGR.queue_message('value', self.id, value)
 
     def _write_hw(self, bitval):  # Must be replaced by subclass.
         pass
@@ -361,6 +369,8 @@ class BCM283X(Port):
             self._dutycycle = DUTYCYCLE
             self._frequency = FREQUENCY
             self._pwm = None
+            self._save_change = self.change
+            self._save_interval = self.interval
 
             # Set default channel configuration and read channel value.
 
@@ -403,6 +413,8 @@ class BCM283X(Port):
                         if self._pwm:  # Stop/delete existing pwm, if active.
                             self._pwm.stop()
                             del self._pwm
+                        self._save_change = self.change
+                        self._save_interval = self.interval
                         self.change = self.interval = NONE
                         self._pwm = GPIO.PWM(self._number, self._frequency)
                         self._pwm.start(self._dutycycle)
@@ -411,11 +423,19 @@ class BCM283X(Port):
                         self._pwm.stop()
                         del self._pwm
                         self._pwm = None
-                        self.change = CHANGE
-                        self.interval = INTERVAL
+                        self.change = self._save_change
+                        self.interval = self._save_interval
 
         def write(self, bitval):
-            self._write(bitval)
+            if self._check_direction(OUTPUT):
+                if self._check_bitval(bitval):
+                    if self._pwm:  # Stop/delete existing pwm, if active.
+                        self._pwm.stop()
+                        del self._pwm
+                        self._pwm = None
+                        self.change = self._save_change
+                        self.interval = self._save_interval
+                    self._write(bitval)
 
         # Semi-private method called only by read() and the port method
         # _poll().
@@ -479,11 +499,22 @@ class MCP230XX(Port):
 
     def _poll(self, now):  # Replaces superclass method.
         with self.lock:
-            self._gpio.read()
-            changes = self._gpio.value ^ self._gpio.prior_value
+            try:
+                self._gpio.read()
+                changes = self._gpio.value ^ self._gpio.prior_value
+            except OSError as err:
+                self._running = False
+                err_msg = ('polling read error on port "%s"; port stopped'
+                           % self.name)
+                IOMGR.queue_message('ERROR', err_msg)
+                IOMGR.queue_message('ERROR', err)
+                changes = 0xff
             for channel in self._channels:
                 mask = 1 << channel.number
-                bitval = 1 if self._gpio.value & mask else 0
+                if self._running:  # gpio register read was good.
+                    bitval = 1 if self._gpio.value & mask else 0
+                else:  # gpio register read error.
+                    bitval = '!ERROR'
                 channel.prior_value = channel.value
                 channel.value = bitval
                 if channel.change and changes & mask:
@@ -581,7 +612,9 @@ class MCP230XX(Port):
                     self._gppu.update(self.number, pullup)
 
         def write(self, bitval):
-            self._write(bitval)
+            if self._check_direction(OUTPUT):
+                if self._check_bitval(bitval):
+                    self._write(bitval)
 
         # Semi-private method called only by read() and the port method
         # _poll().
@@ -613,6 +646,8 @@ class MCP342X(Port):
     def _value_changed(self, channel):  # Replaces superclass method.
         pval = channel.prior_value
         val = channel.value
+        if val == '!ERROR':
+            return True
         changed = False
         if pval:
             change = 100.0 * fabs(val - pval) / pval
@@ -889,39 +924,50 @@ class IOMGR:
 
         argument = None
         arg_match = u'DEFAULT'
+        arg_match_isanumber = False
         if nsplit == 3:
             argument = rsplit[2]
             arg_match = argument.lower()
+            arg_match_isanumber = arg_match.replace('.', '', 1).isdecimal()
         for arg in REQUESTS[request_id]:
             if arg.startswith(arg_match):
                 argument = REQUESTS[request_id][arg]
                 break
-            elif arg == '*' and arg_match != 'default':
+            elif arg == '*' and arg_match != 'DEFAULT':
                 break
-            elif arg == '<=' and argument.replace('.', '', 1).isdecimal():
-                if argument.isdecimal():
-                    argument = int(argument)
-                else:
-                    argument = float(argument)
-                if argument <= REQUESTS[request_id][arg]:
+            elif arg in ('#', '<=') and arg_match_isanumber:
+                argument = (float(argument) if '.' in argument
+                            else int(argument))
+                if arg == '#':
+                    break
+                elif argument <= REQUESTS[request_id][arg]:
                     break
         else:
             warn = 'invalid argument "%s"; request ignored' % argument
             cls.queue_message('WARNING', warn)
             return
 
-        # Valid request; invoke channel methods to process the request.
+        # Valid request; call channel method or set channel attribute to
+        # process the request.
 
-        method = getattr(channel, request_id, None)
-        if method is None:
-            warn = ('request id "%s" is not valid for channel %s; '
+        attr = getattr(channel, request_id, None)
+        if attr is None:  # Not a method or attribute for this channel.
+            warn = ('request id "%s" is not valid for channel "%s"; '
                     'request ignored' % (request_id, channel.id))
             cls.queue_message('WARNING', warn)
-        else:
+        else:  # request_id is a valid attribute or method for this channel.
             with channel.lock:
-                if hasattr(method, '__call__'):
-                    method() if argument is None else method(argument)
-                else:
+                if hasattr(attr, '__call__'):  # It is a method; call it.
+                    method = attr
+                    try:
+                        method() if argument is None else method(argument)
+                    except OSError as err:
+                        err_msg = ('error in calling "%s" method for '
+                                   'channel "%s"; state unknown'
+                                   % (request_id, channel.id))
+                        cls.queue_message('ERROR', err_msg)
+                        cls.queue_message('ERROR', err)
+                else:  # It is an attribute; set value to argument.
                     setattr(channel, request_id, argument)
 
 
