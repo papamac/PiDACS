@@ -36,7 +36,7 @@ Device characteristics for current and soon to be supported I/O devices:
 BCM2835,6,7  Raspberry Pi Baseline GPIO           1     gg0, gp0     7
              GPIOs 17-18, 22-25, 27
 BCM2835,6,7  Raspberry Pi Extended GPIO           1     gg1, gp1     9
-             GPIOs 5-6, 12-13, 16, 19-21, 27
+             GPIOs 5-6, 12-13, 16, 19-21, 26
  MCP23008    8-Bit I/O Expander                   8        ga        8
  MCP23017    16-Bit I/O Expander (A Port)         8        ga        8
  MCP23017    16-Bit I/O Expander (B Port)         8        gb        8

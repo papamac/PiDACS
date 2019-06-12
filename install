@@ -73,12 +73,11 @@ mkdirx ${log}/pidacs
 
 if [ "$port_names" ]; then
 
-    # Copy daemon script and create port_names.
+    # Copy daemon script and create port_names file.
 
     sudo cp pidacsd /etc/init.d
     mkdirx $etc
-    echo $port_names > port_names
-    sudo mv port_names $etc
+    echo $port_names | sudo tee ${etc}/port_names
 
     # Link the pidacs daemon script and start it.
 
