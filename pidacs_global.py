@@ -53,7 +53,7 @@ SERVER_TIMEOUT = 610.0        # Timeout limit for server keep-alive or other
 #                               data messages (sec).  Must be comfortably
 #                               longer than the IOMGR STATUS_INTERVAL (600 sec)
 #                               to allow time for network delays.
-DEFAULT_ADDRESS = 'raspi3bp-ha.local'     # papamac's favorite server.
+DEFAULT_ADDRESS = 'localhost' # local pidacs server.
 DYNAMIC_PORT_RANGE = range(49152, 65535)  # Range of valid dynamic ports.
 DEFAULT_PORT_NUMBER = 50000   # Arbitrary selection from DYNAMIC_PORT_RANGE.
 
