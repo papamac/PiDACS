@@ -117,17 +117,17 @@ class PIC:
                 err_msg = 'Server timeout "%s"' % cls._address
                 break
             cls._dt_recvd = datetime.now()
-            messagedt = message[:DATETIME_LENGTH]
+            dt_message = message[:DATETIME_LENGTH]
             try:
-                dt_sent = datetime.strptime(messagedt, '%Y-%m-%d %H:%M:%S.%f')
+                dt_sent = datetime.strptime(dt_message, '%Y-%m-%d %H:%M:%S.%f')
             except ValueError:
-                print('******** invalid datetime "%s" ********' % messagedt)
+                print('******** invalid datetime "%s" ********' % dt_message)
                 continue
             latency = (cls._dt_recvd - dt_sent).total_seconds()
             if latency > LATENCY:
                 print('******** late message; latency = %3.1f sec********'
                       % latency)
-            print(message[DATETIME_LENGTH + 1:])
+            print(message[DATETIME_LENGTH + 4:])
         else:
             return
 
