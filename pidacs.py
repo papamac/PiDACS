@@ -27,13 +27,14 @@ DESCRIPTION
 
 """
 __author__ = 'papamac'
-__version__ = '0.9.0'
-__date__ = 'April 12, 2018'
+__version__ = '0.9.5'
+__date__ = 'August 9, 2019'
 
 from signal import signal, SIGTERM
 from threading import Thread
 
 from iomgr import IOMGR
+from logging import DEBUG, ERROR, WARNING
 from nbi import NBI
 from pidacs_global import *
 
@@ -68,27 +69,27 @@ class Client(Thread):
                     continue
             except OSError as err:
                 err_msg = 'recv error "%s"; client stopped' % self.socket_id
-                IOMGR.queue_message('ERROR', err_msg)
-                IOMGR.queue_message('ERROR', '%s' % err)
+                IOMGR.queue_message(ERROR, err_msg)
+                IOMGR.queue_message(ERROR, '%s' % err)
                 break
             except BrokenPipe:
-                status = 'client disconnected "%s"' % self.socket_id
-                IOMGR.queue_message('status', status)
+                warning = 'client disconnected "%s"' % self.socket_id
+                IOMGR.queue_message(WARNING, warning)
                 break
             dt_recvd = datetime.now()
             requestdt = request[:DATETIME_LENGTH]
             try:
                 dt_sent = datetime.strptime(requestdt, '%Y-%m-%d %H:%M:%S.%f')
             except ValueError:
-                warn = ('request has invalid datetime "%s" %s'
-                        % (self.socket_id, requestdt))
-                IOMGR.queue_message('WARNING', warn)
+                warning = ('request has invalid datetime "%s" %s'
+                           % (self.socket_id, requestdt))
+                IOMGR.queue_message(WARNING, warning)
                 continue
             latency = (dt_recvd - dt_sent).total_seconds()
             if latency > LATENCY:
-                warn = ('late request "%s"; latency = %3.1f sec'
-                        % (self.socket_id, latency))
-                IOMGR.queue_message('WARNING', warn)
+                warning = ('late request "%s"; latency = %3.1f sec'
+                           % (self.socket_id, latency))
+                IOMGR.queue_message(WARNING, warning)
             IOMGR.process_request(request[DATETIME_LENGTH + 1:])
         else:
             return
@@ -116,12 +117,12 @@ class PiDACS:
         if port_number.isnumeric():
             port_number = int(port_number)
             if port_number not in DYNAMIC_PORT_RANGE:
-                IOMGR.log.warn('port number not in dynamic port range "%s"; '
-                               'default used' % port_number)
+                IOMGR.log.warning('port number not in dynamic port range '
+                                  '"%s"; default used' % port_number)
                 port_number = DEFAULT_PORT_NUMBER
         else:
-            IOMGR.log.warn('port number is not an integer "%s"; default used'
-                           % port_number)
+            IOMGR.log.warning('port number is not an integer "%s"; default '
+                              'used' % port_number)
             port_number = DEFAULT_PORT_NUMBER
         address_tuple = '', port_number
         try:
@@ -167,7 +168,7 @@ class PiDACS:
                 continue
             client_socket_id = '%s:%i' % client_address_tuple
             status = 'client connected "%s"' % client_socket_id
-            IOMGR.queue_message('status', status)
+            IOMGR.queue_message(DEBUG, status)
             client_socket.settimeout(SOCKET_TIMEOUT)
             client = Client(client_socket, client_socket_id)
             client.start()
@@ -184,12 +185,12 @@ class PiDACS:
                         except OSError as err:
                             err_msg = ('send error "%s"; client stopped'
                                        % client.socket_id)
-                            IOMGR.queue_message('ERROR', err_msg)
-                            IOMGR.queue_message('ERROR', '%s' % err)
+                            IOMGR.queue_message(ERROR, err_msg)
+                            IOMGR.queue_message(ERROR, '%s' % err)
                         except BrokenPipe:
                             err_msg = ('broken pipe "%s"; client stopped'
                                        % client.socket_id)
-                            IOMGR.queue_message('ERROR', err_msg)
+                            IOMGR.queue_message(ERROR, err_msg)
                         else:
                             continue
                         client.running = False

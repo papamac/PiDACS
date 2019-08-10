@@ -51,12 +51,12 @@ BCM2835,6,7  Raspberry Pi Extended GPIO           1     gg1, gp1     9
 """
 
 __author__ = 'papamac'
-__version__ = '0.9.1'
-__date__ = 'April 12, 2018'
+__version__ = '0.9.5'
+__date__ = 'August 9, 2019'
 
 from argparse import ArgumentParser
 from datetime import datetime
-from logging import DEBUG, INFO, WARNING, ERROR
+from logging import DEBUG, WARNING, ERROR
 from logging import Formatter, getLogger, StreamHandler
 from logging.handlers import TimedRotatingFileHandler
 from math import fabs, log2
@@ -861,7 +861,8 @@ class IOMGR:
                 cls.queue_message(WARNING, warning)
                 port_names = DEFAULT_PORT_NAMES
         port_names = port_names.replace(',', '').lower()
-        cls.log.info('Starting %s using port(s) %s' % (cls.name, port_names))
+        cls.queue_message(DEBUG, "starting %s using port(s) '%s'"
+                          % (cls.name, port_names))
         port_names = port_names.split()
         for port_name in port_names:
             if len(port_name) == 3 and port_name[2].isdecimal():

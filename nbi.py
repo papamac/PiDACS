@@ -27,8 +27,8 @@ Non-blocking console input (nbi)
 
 """
 __author__ = 'papamac'
-__version__ = '0.9.0'
-__date__ = 'April 12, 2018'
+__version__ = '0.9.5'
+__date__ = 'August 9, 2019'
 
 from queue import *
 from threading import Thread
