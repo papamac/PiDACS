@@ -57,7 +57,7 @@ __date__ = 'August 9, 2019'
 from argparse import ArgumentParser
 from datetime import datetime
 from logging import DEBUG, WARNING, ERROR
-from logging import Formatter, getLogger, StreamHandler
+from logging import addLevelName, Formatter, getLogger, StreamHandler
 from logging.handlers import TimedRotatingFileHandler
 from math import fabs, log2
 from queue import *
@@ -67,6 +67,7 @@ from time import sleep
 
 from i2cbus import I2CBUS
 from nbi import NBI
+from pidacs_global import DATA_INT, DATA_CHG, DATA_REQ
 from pidacs_global import MESSAGE_LENGTH, DATETIME_LENGTH, DEFAULT_PORT_NUMBER
 import RPi.GPIO as GPIO
 
@@ -221,7 +222,7 @@ class Port(Thread):
 
     def run(self):
         poll_count = 0
-        status_dt = datetime.now()
+        dt_status = datetime.now()
 
         # Port execution thread run loop:
 
@@ -239,16 +240,16 @@ class Port(Thread):
             # Perform periodic polling and status functions.
 
             if self._running:
-                now = datetime.now()
-                self._poll(now)
+                dt_now = datetime.now()
+                self._poll(dt_now)
                 poll_count += 1
-                status_int = (now - status_dt).total_seconds()
+                status_int = (dt_now - dt_status).total_seconds()
                 if status_int >= STATUS_INTERVAL:
                     rate = poll_count / status_int
-                    IOMGR.queue_message(DEBUG, '%s port polling rate = %d '
+                    IOMGR.queue_message(DEBUG, '%s polling rate = %d '
                                         'per sec' % (self.name, rate))
                     poll_count = 0
-                    status_dt = now
+                    dt_status = dt_now
 
     @staticmethod
     def _execute_request(channel, request_id, argument):
@@ -270,7 +271,7 @@ class Port(Thread):
             else:  # It is an attribute; set value to argument.
                 setattr(channel, request_id, argument)
 
-    def _poll(self, now):
+    def _poll(self, dt_now):
         for channel in self._channels:
             if channel.change or channel.interval:
                 try:
@@ -285,11 +286,11 @@ class Port(Thread):
                 channel.prior_value = channel.value
                 channel.value = value
                 if channel.change and self._value_changed(channel):
-                    IOMGR.queue_message(DEBUG, channel.id, channel.value)
-                interval = (now - channel.prior_report).total_seconds()
+                    IOMGR.queue_message(DATA_CHG, channel.id, channel.value)
+                interval = (dt_now - channel.prior_report).total_seconds()
                 if channel.interval and interval >= channel.interval:
-                    IOMGR.queue_message(DEBUG, channel.id, channel.value)
-                    channel.prior_report = now
+                    IOMGR.queue_message(DATA_INT, channel.id, channel.value)
+                    channel.prior_report = dt_now
 
     def _value_changed(self, channel):
         return channel.value != channel.prior_value
@@ -329,7 +330,7 @@ class Channel:
     def read(self):
         self.prior_value = self.value
         self.value = self.read_hw()
-        IOMGR.queue_message(DEBUG, self.id, self.value)
+        IOMGR.queue_message(DATA_REQ, self.id, self.value)
 
     # Semi-private method called only by read() and the port method _poll();
     # must be replaced by the Channel subclass.
@@ -343,7 +344,7 @@ class Channel:
     def _check_bitval(bitval):
         ok = bitval in (0, 1)
         if not ok:
-            warning = 'invalid argument "%s"; request ignored' % bitval
+            warning = 'invalid bit value "%s"; request ignored' % bitval
             IOMGR.queue_message(WARNING, warning)
         return ok
 
@@ -365,7 +366,7 @@ class Channel:
         self._write_hw(value)
         self.prior_value = self.value
         self.value = value
-        IOMGR.queue_message(DEBUG, self.id, value)
+        IOMGR.queue_message(DATA_REQ, self.id, value)
 
     def _write_hw(self, bitval):  # Must be replaced by subclass.
         pass
@@ -542,7 +543,7 @@ class MCP230XX(Port):
             channel = self._Channel(self, channel_name)
             self._channels.append(channel)
 
-    def _poll(self, now):  # Replaces superclass method.
+    def _poll(self, dt_now):  # Replaces superclass method.
         try:
             self._gpio.read()
             changes = self._gpio.value ^ self._gpio.prior_value
@@ -562,11 +563,11 @@ class MCP230XX(Port):
             channel.prior_value = channel.value
             channel.value = bitval
             if channel.change and changes & mask:
-                IOMGR.queue_message(DEBUG, channel.id, bitval)
-            interval = (now - channel.prior_report).total_seconds()
+                IOMGR.queue_message(DATA_CHG, channel.id, bitval)
+            interval = (dt_now - channel.prior_report).total_seconds()
             if channel.interval and interval >= channel.interval:
-                IOMGR.queue_message(DEBUG, channel.id, bitval)
-                channel.prior_report = now
+                IOMGR.queue_message(DATA_INT, channel.id, bitval)
+                channel.prior_report = dt_now
 
     class _Register:
         """
@@ -798,17 +799,23 @@ class IOMGR:
                             help='log data and status to a file in '
                                  '/var/log/piDACS')
         parser.add_argument('-L', '--log_level', default='INFO',
-                            choices=['DEBUG', 'INFO', 'WARNING', 'ERROR',
+                            choices=['DEBUG', 'DATA_INT', 'DATA_CHG',
+                                     'DATA_REQ', 'INFO', 'WARNING', 'ERROR',
                                      'CRITICAL'],
                             help='logging level for optional file logging')
         parser.add_argument('-p', '--print', action='store_true',
                             help='print data and status to sys.stdout')
         parser.add_argument('-P', '--print_level', default='INFO',
-                            choices=['DEBUG', 'INFO', 'WARNING', 'ERROR',
+                            choices=['DEBUG', 'DATA_INT', 'DATA_CHG',
+                                     'DATA_REQ', 'INFO', 'WARNING', 'ERROR',
                                      'CRITICAL'],
                             help='logging level for optional printing')
         cls.name = parser.prog.replace('.py', '')
         cls.args = parser.parse_args()
+
+        addLevelName(DATA_INT, 'DATA_INT')
+        addLevelName(DATA_CHG, 'DATA_CHG')
+        addLevelName(DATA_REQ, 'DATA_REQ')
 
         cls.log = getLogger(cls.name)
         cls.log.setLevel(DEBUG)
@@ -822,7 +829,7 @@ class IOMGR:
             argstr = ''
             for arg in argv[1:]:
                 argstr = argstr + arg + ' '
-            cls.log.info('Initializing %s with options %s'
+            cls.log.info('initializing %s with options %s'
                          % (cls.name, argstr))
 
         if cls.args.log:

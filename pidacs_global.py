@@ -32,7 +32,13 @@ from datetime import datetime
 from socket import *
 
 
-# PiDACS message length constants:
+# Data logging levels used in log.log(level, ..) and log.setLevel(level):
+
+DATA_INT = 14                 # Data value reported by interval reporting
+DATA_CHG = 15                 # Data value reported by change detection
+DATA_REQ = 16                 # Data value reported by user request
+
+# Message length constants:
 
 MESSAGE_LENGTH = 110          # Fixed message length for data queue and sockets
 #                              (bytes).
@@ -41,7 +47,7 @@ DATETIME_LENGTH = len(str(datetime.now()))  # Length of datetime message
 TEXT_LENGTH = MESSAGE_LENGTH - DATETIME_LENGTH - 3  # Length of text message
 #                                                     segment (bytes).
 
-# PiDACS socket/server constants:
+# Socket/server constants:
 
 SOCKET_TIMEOUT = 0.75         # Timeout limit for socket connection, recv, and
 #                               send methods (sec).
@@ -58,7 +64,7 @@ DYNAMIC_PORT_RANGE = range(49152, 65535)  # Range of valid dynamic ports.
 DEFAULT_PORT_NUMBER = 50000   # Arbitrary selection from DYNAMIC_PORT_RANGE.
 
 
-# PiDACS exceptions:
+# Exceptions:
 
 class BrokenPipe(Exception):
     pass
