@@ -68,7 +68,7 @@ sudo ln -fs ${src}/pidacs.py ${bin}/pidacs
 
 # Install and start server daemon if argument is not null.
 
-if [ $port_names ]; then
+if [ "$port_names" ]; then
 
     # Stop pidacs daemon if it is running.
 
