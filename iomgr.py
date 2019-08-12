@@ -56,7 +56,7 @@ __date__ = 'August 9, 2019'
 
 from argparse import ArgumentParser
 from datetime import datetime
-from logging import DEBUG, WARNING, ERROR
+from logging import DEBUG, INFO, WARNING, ERROR
 from logging import addLevelName, Formatter, getLogger, StreamHandler
 from logging.handlers import TimedRotatingFileHandler
 from math import fabs, log2
@@ -823,15 +823,10 @@ class IOMGR:
 
         if cls.args.print:
             print_handler = StreamHandler()
-            print_handler.setLevel(cls.args.print_level)
+            print_handler.setLevel(eval(cls.args.print_level))
             print_formatter = Formatter('%(message)s')
             print_handler.setFormatter(print_formatter)
             cls.log.addHandler(print_handler)
-            argstr = ''
-            for arg in argv[1:]:
-                argstr = argstr + arg + ' '
-            cls.log.info('initializing %s with options %s'
-                         % (cls.name, argstr))
 
         if cls.args.log:
             log_name = cls.name.lower()
@@ -843,12 +838,12 @@ class IOMGR:
                                                        when='midnight')
             except OSError as err:
                 err_msg = ('error in opening "%s"; log option ignored'
-                           % filename)
+                           % file_path)
                 cls.queue_message(ERROR, err_msg)
                 cls.queue_message(ERROR, err)
                 return
             else:
-                log_handler.setLevel(cls.args.log_level)
+                log_handler.setLevel(eval(cls.args.log_level))
                 log_formatter = Formatter(
                     '%(asctime)s %(levelname)s %(message)s')
                 log_handler.setFormatter(log_formatter)
@@ -857,8 +852,17 @@ class IOMGR:
     @classmethod
     def start(cls):
         """
-        Check for valid port names and instantiate/start valid ports.
+        Start IOMGR ports.
         """
+        argstr = ''
+        for arg in argv[1:]:
+            argstr = argstr + arg + ' '
+        cls.queue_message(INFO, 'starting %s with options %s'
+                          % (cls.name, argstr))
+
+        # Get port names list from the command line argument, the port_names
+        # file, or the DEFAULT_PORT_NAMES.
+
         port_names = cls.args.port_names
         if not port_names:
             try:
@@ -870,10 +874,10 @@ class IOMGR:
                            'file; defaults used')
                 cls.queue_message(WARNING, warning)
                 port_names = DEFAULT_PORT_NAMES
-        port_names = port_names.replace(',', '').lower()
-        cls.queue_message(DEBUG, "starting %s using port(s) '%s'"
-                          % (cls.name, port_names))
-        port_names = port_names.split()
+        port_names = port_names.replace(',', '').lower().split()
+
+        # Check port names and instantiate/start valid ports.
+
         for port_name in port_names:
             if len(port_name) == 3 and port_name[2].isdecimal():
                 port_type = port_name[:2]
@@ -889,7 +893,7 @@ class IOMGR:
                         if port.name in (port_name, alt_port_name):
                             break
                     else:
-                        cls.queue_message(DEBUG, 'starting port "%s"'
+                        cls.queue_message(INFO, 'starting port "%s"'
                                           % port_name)
                         try:
                             port = cls._PORTS[port_type][1](port_name)
