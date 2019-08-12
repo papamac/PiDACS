@@ -77,7 +77,7 @@ if [ "$port_names" ]; then
     # Copy daemon script and create port_names file.
 
     sudo cp pidacsd /etc/init.d
-    mkdir -p $etc
+    sudo mkdir -p $etc
     echo $port_names | sudo tee ${etc}/port_names
 
     # Link the pidacs daemon script and start it.
