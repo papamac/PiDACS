@@ -1,6 +1,4 @@
-#!/bin/sh
-
-# Raspberry Pi data acquisition and Control System (PiDACS)
+# Raspberry Pi Data Acquisition and Control System (PiDACS)
 
 # PiDACS server daemon script (pidacsd).
 
@@ -14,7 +12,8 @@
 # Description:        PiDACS server
 ### END INIT INFO
 
-case "$1" in
+cmd=$1
+case $cmd in
     start)
         start-stop-daemon -Sbx /usr/local/bin/pidacs -- -l
         ;;

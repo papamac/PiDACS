@@ -60,6 +60,7 @@ from logging import DEBUG, WARNING, ERROR
 from logging import addLevelName, Formatter, getLogger, StreamHandler
 from logging.handlers import TimedRotatingFileHandler
 from math import fabs, log2
+from pathlib import Path
 from queue import *
 from sys import argv
 from threading import Thread
@@ -813,9 +814,9 @@ class IOMGR:
         cls.name = parser.prog.replace('.py', '')
         cls.args = parser.parse_args()
 
-        addLevelName(DATA_INT, 'DATA_INT')
-        addLevelName(DATA_CHG, 'DATA_CHG')
-        addLevelName(DATA_REQ, 'DATA_REQ')
+        addLevelName(DATA_INT, 'Interval Data')
+        addLevelName(DATA_CHG, 'Change Data')
+        addLevelName(DATA_REQ, 'Request Data')
 
         cls.log = getLogger(cls.name)
         cls.log.setLevel(DEBUG)
@@ -834,9 +835,11 @@ class IOMGR:
 
         if cls.args.log:
             log_name = cls.name.lower()
-            filename = '/var/local/log/%s/%s.log' % (log_name, log_name)
+            dir_path = Path('/var/local/log/%s' % log_name)
+            dir_path.mkdir(exist_ok=True)  # Make directories if none exist.
+            file_path = dir_path / Path('%s.log' % log_name)
             try:
-                log_handler = TimedRotatingFileHandler(filename,
+                log_handler = TimedRotatingFileHandler(file_path,
                                                        when='midnight')
             except OSError as err:
                 err_msg = ('error in opening "%s"; log option ignored'

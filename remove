@@ -1,16 +1,15 @@
-#!/bin/sh
 set -o xtrace
 
 # Raspberry Pi Data Acquisition and Control System (PiDACS)
 
-# Uninstall PiDACS components and stop pidacs server daemon, if running.
+# Remove PiDACS components and stop pidacs server daemon, if running.
 
-# The uninstall script must be executed from the same directory as the PiDACS
-# source and script files.  Usage is as follows:
+# The remove script is normally executed from the same directory as the PiDACS
+# source and script files (/usr/local/src/pidacs).  Usage is as follows:
 
-# ./uninstall
+# ./remove
 
-# The uninstal script can be executed multiple times without error.
+# The remove script can be executed multiple times without error.
 
 usr=/usr/local
 bin=${usr}/bin
@@ -29,8 +28,6 @@ sudo rm -fr ${log}/pidacs
 
 # Stop pidacs daemon and remove daemon script/links.
 
-if [ -f $daemon ]; then
-    sudo $daemon stop
-    sudo rm -f $daemon
-fi
+sudo start-stop-daemon -Kn pidacs
+sudo rm -f $daemon
 sudo update-rc.d pidacsd remove
