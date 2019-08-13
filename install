@@ -56,8 +56,8 @@ src=${usr}/src/pidacs
 
 # Copy source files and create executable links.
 
-mkdir -p $src
 if [ $PWD != $src ]; then
+    mkdir -p $src
     sudo cp * $src
 fi
 

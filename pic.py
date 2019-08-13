@@ -127,7 +127,7 @@ class PIC:
             if latency > LATENCY:
                 print('******** late message; latency = %3.1f sec********'
                       % latency)
-            print(message[DATETIME_LENGTH + 4:])
+            print(message[DATETIME_LENGTH + 1:])
         else:
             return
 

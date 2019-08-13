@@ -233,24 +233,23 @@ class Port(Thread):
 
             while self._running:
                 try:
-                    request = self._queue.get(timeout=1)
+                    request = self._queue.get(block=False)
                 except Empty:
                     break
                 self._execute_request(*request)
 
             # Perform periodic polling and status functions.
 
-            if self._running:
-                dt_now = datetime.now()
-                self._poll(dt_now)
-                poll_count += 1
-                status_int = (dt_now - dt_status).total_seconds()
-                if status_int >= STATUS_INTERVAL:
-                    rate = poll_count / status_int
-                    IOMGR.queue_message(DEBUG, '%s polling rate = %d '
-                                        'per sec' % (self.name, rate))
-                    poll_count = 0
-                    dt_status = dt_now
+            dt_now = datetime.now()
+            self._poll(dt_now)
+            poll_count += 1
+            status_int = (dt_now - dt_status).total_seconds()
+            if status_int >= STATUS_INTERVAL:
+                rate = poll_count / status_int
+                IOMGR.queue_message(DEBUG, '%s polling rate = %d '
+                                    'per sec' % (self.name, rate))
+                poll_count = 0
+                dt_status = dt_now
 
     @staticmethod
     def _execute_request(channel, request_id, argument):
