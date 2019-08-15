@@ -1,5 +1,6 @@
 #!/bin/bash
 set -o xtrace
+
 # Raspberry Pi Data Acquisition and Control System (PiDACS)
 
 # Remove PiDACS components and stop pidacs server daemon, if running.

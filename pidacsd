@@ -1,4 +1,5 @@
 #!/bin/bash
+
 ### BEGIN INIT INFO
 # Provides:           PiDACS server
 # Required-Start:     $local_fs $syslog $network
