@@ -32,11 +32,9 @@ from datetime import datetime
 from socket import *
 
 
-# Data logging levels used in log.log(level, ..) and log.setLevel(level):
+# Data logging level used in log.log(level, ..) and log.setLevel(level):
 
-DATA_INT = 14                 # Data value reported by interval reporting
-DATA_CHG = 15                 # Data value reported by change detection
-DATA_REQ = 16                 # Data value reported by user request
+DATA = 15                     # Data value from IOMGR
 
 # Message length constants:
 
@@ -53,8 +51,8 @@ SOCKET_TIMEOUT = 0.75         # Timeout limit for socket connection, recv, and
 #                               send methods (sec).
 LATENCY = 1.0                 # Limit on network latency for all server to
 #                               client messages (sec).  Exceeding the latency
-#                               limit is reported for user awareness, but does
-#                               nor otherwise effect rpio processing.
+#                               limit is reported for user awareness, but has
+#                               no other effect.
 SERVER_TIMEOUT = 610.0        # Timeout limit for server keep-alive or other
 #                               data messages (sec).  Must be comfortably
 #                               longer than the IOMGR STATUS_INTERVAL (600 sec)

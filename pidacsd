@@ -1,6 +1,4 @@
-# Raspberry Pi Data Acquisition and Control System (PiDACS)
-
-# PiDACS server daemon script (pidacsd).
+#!/bin/bash
 
 ### BEGIN INIT INFO
 # Provides:           PiDACS server
@@ -12,16 +10,20 @@
 # Description:        PiDACS server
 ### END INIT INFO
 
+# Raspberry Pi Data Acquisition and Control System (PiDACS)
+
+# PiDACS server daemon script (pidacsd).
+
 cmd=$1
 case $cmd in
     start)
-        start-stop-daemon -Sbx /usr/local/bin/pidacs -- -l
+        sudo /usr/local/bin/pidacs -l 2>&1 &
         ;;
     stop)
-        start-stop-daemon -Kn pidacs
+        sudo killall pidacs
         ;;
     *)
-        echo 'Usage sudo /etc/init.d/pidacsd {start|stop}'
+        echo 'Usage /etc/init.d/pidacsd {start|stop}'
         exit 1
         ;;
 esac

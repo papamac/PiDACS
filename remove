@@ -1,3 +1,4 @@
+#!/bin/bash
 set -o xtrace
 
 # Raspberry Pi Data Acquisition and Control System (PiDACS)
@@ -28,6 +29,6 @@ sudo rm -fr ${log}/pidacs
 
 # Stop pidacs daemon and remove daemon script/links.
 
-sudo start-stop-daemon -Kn pidacs
+sudo killall pidacs
 sudo rm -f $daemon
 sudo update-rc.d pidacsd remove

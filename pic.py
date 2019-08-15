@@ -27,8 +27,8 @@ DESCRIPTION
 
 """
 __author__ = 'papamac'
-__version__ = '0.9.5'
-__date__ = 'August 9, 2019'
+__version__ = '0.9.7'
+__date__ = 'August 14, 2019'
 
 from threading import Thread
 

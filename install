@@ -1,3 +1,4 @@
+#!/bin/bash
 set -o xtrace
 
 # Raspberry Pi Data Acquisition and Control System (PiDACS)
@@ -61,6 +62,7 @@ if [ $PWD != $src ]; then
     sudo cp * $src
 fi
 
+sudo chmod +x ${src}/install ${src}/pidacsd ${src}/remove
 sudo chmod +x ${src}/iomgr.py ${src}/pic.py ${src}/pidacs.py
 sudo ln -fs ${src}/iomgr.py ${bin}/iomgr
 sudo ln -fs ${src}/pic.py ${bin}/pic
@@ -72,13 +74,13 @@ if [ "$port_names" ]; then
 
     # Stop pidacs daemon if it is running.
 
-    sudo start-stop-daemon -Kn pidacs
+    sudo killall pidacs
 
     # Copy daemon script and create port_names file.
 
     sudo cp pidacsd /etc/init.d
     sudo mkdir -p $etc
-    echo $port_names | sudo tee ${etc}/port_names
+    echo $port_names | sudo tee ${etc}/port_names > /dev/null
 
     # Link the pidacs daemon script and start it.
 
