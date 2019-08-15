@@ -41,14 +41,9 @@ class NBI(Thread):
 
     @classmethod
     def start(cls):
-        cls._nbi = Thread(name='nbi', target=cls._queue_input, daemon=True)
+        cls._nbi = Thread(name='nbi', daemon=True)
         cls._running = True
         cls._nbi.start()
-
-    @classmethod
-    def _queue_input(cls):
-        while True:
-            cls._queue.put(input())
 
     @classmethod
     def get_input(cls):
@@ -57,3 +52,8 @@ class NBI(Thread):
         except Empty:
             data = None
         return data
+
+    @classmethod
+    def run(cls):
+        while True:
+            cls._queue.put(input())

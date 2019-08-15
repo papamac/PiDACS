@@ -999,13 +999,18 @@ class IOMGR:
             cls.queue_message(WARNING, warning)
             return
 
-        # Valid request; execute alias requests immediately, queue other
-        # requests to the appropriate port thread for concurrent execution.
+        # Valid request; queue it to the appropriate port thread for concurrent
+        # execution.  Requests will be executed in sequence on each port, but
+        # may be delayed by I/O on that port.
+
+        channel.port.queue_request(channel, request_id, argument)
+
+        # If the request is an alias, update the Channel.channels dictionary
+        # immediately so that future requests by alias will be recognized even
+        # if the port execution of the alias request is delayed.
 
         if request_id == 'alias':
-            channel.alias(argument)
-        else:
-            channel.port.queue_request(channel, request_id, argument)
+            Channel.channels[argument] = channel
 
 
 # IOMGR main program:

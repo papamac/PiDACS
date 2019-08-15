@@ -48,8 +48,7 @@ class PIC:
         cls._connect_to_server()
         cls._dt_recvd = datetime.now()
         cls.running = True
-        cls._print = Thread(name='print_server_messages',
-                            target=cls._print_server_messages)
+        cls._print = Thread(name='print_server_messages')
         cls._print.start()
 
     @classmethod
@@ -101,7 +100,7 @@ class PIC:
               % (cls._address, socket_id))
 
     @classmethod
-    def _print_server_messages(cls):
+    def run(cls):
         while cls.running:
             try:
                 message = recv_msg(cls, cls._socket, cls._dt_recvd)

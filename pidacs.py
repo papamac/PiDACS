@@ -48,8 +48,7 @@ class Client(Thread):
         self.socket = sock
         self.socket_id = socket_id
         self.running = False
-        Thread.__init__(self, name='Client ' + socket_id,
-                        target=self._process_client_requests)
+        Thread.__init__(self, name='Client ' + socket_id)
         self.clients.append(self)
 
     def start(self):
@@ -61,7 +60,7 @@ class Client(Thread):
         self.join()
         self.socket.close()
 
-    def _process_client_requests(self):
+    def run(self):
         while self.running:
             try:
                 request = recv_msg(self, self.socket)
