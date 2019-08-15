@@ -1,6 +1,5 @@
 #!/bin/bash
 set -o xtrace
-
 # Raspberry Pi Data Acquisition and Control System (PiDACS)
 
 # Install PiDACS components, including:
