@@ -34,16 +34,14 @@ from queue import *
 from threading import Thread
 
 
-class NBI(Thread):
+class NBI:
 
-    _nbi = None
     _queue = Queue()
 
     @classmethod
     def start(cls):
-        cls._nbi = Thread(name='nbi', daemon=True)
-        cls._running = True
-        cls._nbi.start()
+        _nbi = Thread(name='nbi', target=cls._run, daemon=True)
+        _nbi.start()
 
     @classmethod
     def get_input(cls):
@@ -54,6 +52,6 @@ class NBI(Thread):
         return data
 
     @classmethod
-    def run(cls):
+    def _run(cls):
         while True:
             cls._queue.put(input())
