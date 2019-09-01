@@ -15,15 +15,19 @@
 # PiDACS server daemon script (pidacsd).
 
 cmd=$1
+port_names=${2:-'gg0 gg1'}
+usr=${3:-/usr/local}
+bin=${usr}/bin
+
 case $cmd in
     start)
-        sudo /usr/local/bin/pidacs -l 2>&1 &
-        ;;
+        $bin/pidacs -L DATA "$port_names" 2>&1 & ;;
     stop)
-        sudo killall pidacs
-        ;;
+        killall -q pidacs ;;
+    restart)
+        killall -q pidacs
+        $bin/pidacs -l "$port_names" 2>&1 & ;;
     *)
-        echo 'Usage /etc/init.d/pidacsd {start|stop}'
-        exit 1
-        ;;
+        echo "pidacsd: usage: sudo /etc/init.d/pidacsd {start|stop|restart} ['port_names'] [usr dir]"
+        exit 1 ;;
 esac

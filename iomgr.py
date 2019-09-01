@@ -802,13 +802,13 @@ class IOMGR:
         parser.add_argument('-l', '--log', action='store_true',
                             help='log data and status to a file in '
                                  '/var/log/piDACS')
-        parser.add_argument('-L', '--log_level', default='INFO',
+        parser.add_argument('-L', '--log_level',
                             choices=['DEBUG', 'DATA', 'INFO', 'WARNING',
                                      'ERROR', 'CRITICAL'],
                             help='logging level for optional file logging')
         parser.add_argument('-p', '--print', action='store_true',
                             help='print data and status to sys.stdout')
-        parser.add_argument('-P', '--print_level', default='INFO',
+        parser.add_argument('-P', '--print_level',
                             choices=['DEBUG', 'DATA', 'INFO', 'WARNING',
                                      'ERROR', 'CRITICAL'],
                             help='logging level for optional printing')
@@ -820,14 +820,15 @@ class IOMGR:
         cls.log = getLogger(cls.name)
         cls.log.setLevel(DEBUG)
 
-        if cls.args.print:
+        if cls.args.print or cls.args.print_level:
             print_handler = StreamHandler()
-            print_handler.setLevel(cls.args.print_level)
+            level = cls.args.print_level if cls.args.print_level else 'INFO'
+            print_handler.setLevel(level)
             print_formatter = Formatter('%(message)s')
             print_handler.setFormatter(print_formatter)
             cls.log.addHandler(print_handler)
 
-        if cls.args.log:
+        if cls.args.log or cls.args.log_level:
             log_name = cls.name.lower()
             dir_path = Path('/var/local/log/%s' % log_name)
             dir_path.mkdir(exist_ok=True)  # Make directories if none exist.
@@ -842,7 +843,8 @@ class IOMGR:
                 cls.queue_message(ERROR, err)
                 return
             else:
-                log_handler.setLevel(cls.args.log_level)
+                level = cls.args.log_level if cls.args.log_level else 'INFO'
+                log_handler.setLevel(level)
                 log_formatter = Formatter(
                     '%(asctime)s %(levelname)s %(message)s')
                 log_handler.setFormatter(log_formatter)
@@ -853,26 +855,24 @@ class IOMGR:
         """
         Start IOMGR ports.
         """
+        # Reconstruct the argument string from argv[1:].
+
         argstr = ''
         for arg in argv[1:]:
+            if ' ' in arg:
+                arg = "'%s'" % arg
             argstr = argstr + arg + ' '
         cls.queue_message(INFO, 'starting %s with options %s'
                           % (cls.name, argstr))
 
-        # Get port names list from the command line argument, the port_names
-        # file, or the DEFAULT_PORT_NAMES.
+        # Get port names list from the command line argument or the
+        # DEFAULT_PORT_NAMES if no argument is specified.
 
         port_names = cls.args.port_names
         if not port_names:
-            try:
-                pnfile = open('/usr/local/etc/pidacs/port_names', 'r')
-                port_names = pnfile.read().rstrip()
-                pnfile.close()
-            except OSError:
-                warning = ('no port name(s) in command line or port_names '
-                           'file; defaults used')
-                cls.queue_message(WARNING, warning)
-                port_names = DEFAULT_PORT_NAMES
+            warning = ('no port name(s) in the command line; defaults used')
+            cls.queue_message(WARNING, warning)
+            port_names = DEFAULT_PORT_NAMES
         port_names = port_names.replace(',', '').lower().split()
 
         # Check port names and instantiate/start valid ports.

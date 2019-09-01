@@ -1,88 +1,123 @@
-set -o xtrace
-
 # Raspberry Pi Data Acquisition and Control System (PiDACS)
 
-# Install PiDACS components, including:
+# Install all PiDACS files in the correct locations, set executable bits and
+# create executable links.
 
-# iomgr.py  - input/output manager for Raspberry Pi analog/digital I/O.
-# pidacs.py - PiDACS server, including both a local interactive mode and
-#             remote access over a network.
-# pic.py    - PiDACS interactive client (pic) providing interactive access to
-#             pidacs.py services from a remote (or local) Raspberry Pi.
-# iomgr     - executable link to iomgr.py.
-# pic       - executable link to pic.py.
-# pidacs    - executable link to pidacs.py.
-# pidacsd   - bash script to start/stop pidacs.py as a daemon.
+# The PiDACS source files and scripts are installed in the appropriate sub-
+# directories of the <usr> directory as specified by the USR_DIR environment
+# variable, or HOME if USR_DIR is not defined.  As part of the installation,
+# all source files are retained in <usr>/src/pidacs.
 
-# PiDACS Python source files are installed in the local destination directory
-# (/usr/local/src/pidacs) and executable links are added to the local bin
-# directory (/usr/local/bin).  The source files are assumed to be in the
-# current working directory.  If the working directory is not the destination
-# directory, all files in the working directory are copied to the destination
-# directory.  If the working directory is the destination directory, no files
-# are copied and the install script simply creates executable links to existing
-# files.  This works well with the git-get inatall script.
+# The files to be installed are assumed to be in a sub-directory named pidacs
+# in the current working directory.  If no PWD/pidacs sub-directory is found,
+# then existing files in <usr>/src/pidacs (if any) are installed.  If
+# PWD/pidacs exists and the working directory is not <usr>/src, then PWD/pidacs
+# is moved to <usr>/src and installed.
 
-# The install script has a single argument ($1).  If omitted, the script
-# installs all source files and creates executable links, but does not install,
-# link, or start the server daemon (pidacsd).  PiDACS components must be
-# executed from a terminal command line.
+# install has a single argument (port_names=$1).  If omitted, the script
+# installs all source files, but does not install, link, or start the server
+# daemon script (pidacsd).  This is appropriate if pidacs is to be executed
+# from the command line.
 
-# If the argument is specified, script will install the daemon script, create
-# a port_names file from the contents of the argument, link the daemon for
-# automatic startup on reboot, and start the daemon in the current boot
-# session.  The argument must be a string of three-character I/O port names
-# separated by spaces, e.g., 'ga0 gb0, gg0 gg1'.  This string is written to
-# /usr/local/etc/pidacs/port_names and is used by the server daemon in lieu of
-# the port_names argument normally provided in a pidacs command line.
+# If the port_names argument is specified, pidacsd is also installed, linked
+# for automatic startup on reboot, and started in the current boot session.
+# port_names must be a string of three-character I/O port names separated by
+# spaces, e.g., 'ab0 ab1 ga0 gb0'.  This string is edited into the pidacsd
+# script as the argument to the pidacs executable.
 
-# The install script is normally executed from the same directory as the PiDACS
-# source and script files (/usr/local/src/pidacs).  Usage is as follows:
+# The install script is normally executed from <usr>/src.  Usage examples are
+# as follows:
 
-# ./install                   - Install only files and directories; do not
-#                               install the server daemon or execute it.
-# ./install 'ga0 gb0 gg0 gg1' - Install files, directories and the server
-#                               daemon; link the daemon for automatic startup,
-#                               and start the daemon for the specified ports.
+# <usr>/src/install           # Install PiDACS files and directories; do not
+#                               install the pidacsd or execute it.
+# <usr>/src/install 'ab0 ab1' # Install PiDACS files and pidacsd; link pidacsd
+#                               for automatic startup and start it using the
+#                               specified port_names.
 
-# The install script can be run multiple times without an interveneing
-# remove.  It simply overwrites previously installed files.
+# install is also designed to be used with papamac's personal package usility
+# (p2pkg).  Normally, PiDACS is downloaded to the current working directory
+# using ftp (-f) or git (-g) and then installed.  Usage examples are as
+# follows:
 
-port_names=$1
-usr=/usr/local
-bin=${usr}/bin
-etc=${usr}/etc/pidacs
-src=${usr}/src/pidacs
+# p2pkg -fi PiDACS            # Download PiDACS from the ftp server and
+#                               install it in HOME.
+# sudo -E p2pkg -u /usr/local -gI 'ga0 gb0' PiDACS  # Download PiDACS from
+#                               github and install it in /usr/local; install
+#                               and start pidacsd using ports ga0 and gb0.
 
-# Copy source files and create executable links.
+# Set directory and argument variables.
 
-if [ $PWD != $src ]; then
-    mkdir -p $src
-    sudo cp * $src
+if [ $XTRACE ]; then
+    set -x
+fi
+usr=${USR_DIR:-~}             # <usr> directory.
+if [ $usr == /root ]; then
+    echo 'install: usr directory is /root; use sudo -E to preserve the user environment'
+    exit 1
+fi
+bin=$usr/bin                  # <bin> directory.
+src=$usr/src                  # <src> directory.
+p=$src/pidacs                 # PiDACS source directory in <src>.
+var=/var/local                # <var> directory.
+log=$var/log                  # <log> directory.
+port_names=$1                 # port_names argument.
+
+# If the current working directory contains a pidacs sub-directory and it is
+# not the <src> directory, then move the new pidacs sub-directory to <src> for
+# use in the installation.
+
+if [ -d pidacs ]; then
+    if [ $PWD != $src ]; then
+        echo "install: Moving $PWD/pidacs to $src"
+        mkdir -p $src
+        rm -fr $p
+        mv pidacs $src
+    fi
 fi
 
-sudo chmod +x ${src}/install ${src}/pidacsd ${src}/remove
-sudo chmod +x ${src}/iomgr.py ${src}/pic.py ${src}/pidacs.py
-sudo ln -fs ${src}/iomgr.py ${bin}/iomgr
-sudo ln -fs ${src}/pic.py ${bin}/pic
-sudo ln -fs ${src}/pidacs.py ${bin}/pidacs
+# Install files in the <src>/pidacs directory by setting executable bits and
+# creating executable links.
 
-# Install and start server daemon if argument is not null.
+if [ -d $p ]; then
+    echo "install: Installing PiDACS files, directories, and links in $usr"
+    chmod +x $p/install   $p/pidacsd  $p/remove
+    chmod +x $p/iomgr.py  $p/pic.py   $p/pidacs.py
+    ln -fs   $p/iomgr.py  $bin/iomgr
+    ln -fs   $p/pic.py    $bin/pic
+    ln -fs   $p/pidacs.py $bin/pidacs
+else
+    echo 'install: pidacs source directory not found'
+    exit 1
+fi
+
+# Create a <log> directory for iomgr and pidacs log files.  Set the group to
+# adm with write access for group members.
+
+sudo mkdir -p $log
+sudo chgrp adm $log
+sudo chmod g+w $log
+
+# If the port_names argument is specified, install and start the pidacsd script
+# using the specified port_names.
 
 if [ "$port_names" ]; then
+    echo "install: Installing the PiDACS server daemon with port names '$port_names'"
 
-    # Stop pidacs daemon if it is running.
+    # Stop the PiDACS server daemon if it is running.
 
-    sudo killall pidacs
+    killall -q pidacs
 
-    # Copy daemon script and create port_names file.
+    # Edit the daemon script to specify the correct defaults for the port_names
+    # and the usr directory.  These defaults must be hard coded in the script
+    # for use at startup because init.d executes pidacsd without any arguments.
+    # Install the edited script in /etc/init.d and make it executable.
 
-    sudo cp pidacsd /etc/init.d
-    sudo mkdir -p $etc
-    echo $port_names | sudo tee ${etc}/port_names > /dev/null
+    cmds="s|gg0 gg1|$port_names|;s|/usr/local|$usr|;"
+    sed "$cmds" $p/pidacsd | sudo tee /etc/init.d/pidacsd > /dev/null
+    sudo chmod +x /etc/init.d/pidacsd
 
     # Link the pidacs daemon script and start it.
 
     sudo update-rc.d pidacsd defaults
-    sudo /etc/init.d/pidacsd start
+    /etc/init.d/pidacsd start
 fi
