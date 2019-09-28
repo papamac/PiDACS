@@ -112,17 +112,14 @@ class PiDACS:
         cls._socket = socket(AF_INET, SOCK_STREAM)
         cls._socket.settimeout(SOCKET_TIMEOUT)
         cls._socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        port_number = IOMGR.args.IP_port
-        if port_number.isnumeric():
-            port_number = int(port_number)
-            if port_number not in DYNAMIC_PORT_RANGE:
-                IOMGR.log.warning('port number not in dynamic port range '
-                                  '"%s"; default used' % port_number)
-                port_number = DEFAULT_PORT_NUMBER
+        if IOMGR.args.IP_port_number.isnumeric():
+            port_number = int(IOMGR.args.IP_port_number)
         else:
-            IOMGR.log.warning('port number is not an integer "%s"; default '
-                              'used' % port_number)
-            port_number = DEFAULT_PORT_NUMBER
+            port_number = 0
+        if port_number not in DYNAMIC_PORT_RANGE:
+            IOMGR.log.warning('invalid IP port number "%s"; server terminated'
+                              % port_number)
+            return
         address_tuple = '', port_number
         try:
             cls._socket.bind(address_tuple)

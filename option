@@ -1,0 +1,75 @@
+###############################################################################
+#
+#     PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
+#        FILE:  option
+#       TITLE:  Optionally install and start the PiDACS server daemon
+#    FUNCTION:  Install the PiDACS server daemon in /etc/init.d, link it for
+#               automatic startup on reboot, and start it in the current boot
+#               session.
+#       USAGE:  option_arg='port_names'; source src/pidacs/option or
+#               p2pkg -I 'port_names' PiDACS (see examples below).
+#      AUTHOR:  papamac
+#        DATE:  September 20, 2019
+#
+# DESCRIPTION:
+#
+# The option script installs the PiDACS daemon script that has already been
+# downloaded to the src sub-directory of the current working directory.
+# Specifically, it marks the PiDACS executable files (iomgr.py, pic.py, and
+# pidacs.py) as executable and it creates symbolic links to these executables
+# in the bin sub-directory of the current working directory.  install does not
+# install or start the PiDACS daemon.  Use the option script to do this after
+# install is complete.
+#
+# install is designed to be used with papamac's personal package utility
+# (p2pkg).  Normally, the PiDACS package is downloaded to the current working
+# directory using ftp (p2pkg -f) or git (p2pkg -g) and then installed
+# (p2pkg -i).  If PiDACS is to be installed in a root-owned directory, p2pkg -i
+# must be executed using sudo.  Usage examples are as follows:
+#
+# p2pkg -fi PiDACS                      # Download the PiDACS package from the
+#                                         ftp server and install it in the
+#                                         current working directory.
+# cd /usr/local                         # Download the PiDACS package from
+# sudo -E p2pkg -gi PiDACS                github and install it in /usr/local.
+#
+# DEPENDENCIES/LIMITATIONS:
+#
+# When running install via p2pkg in a sudo environment, sudo -E must be used to
+# preserve the user's HOME directory.  install checks for this and exits if
+# $HOME is /root.  papamac's runtime environment (see bash_aliases) prevents
+# this from hapening by aliasing sudo to sudo -E.
+#
+###############################################################################
+
+# If the port_names argument is specified, install and start the pidacsd script
+# using the specified port_names.
+
+declare -i port_number=${option_arg:-50000}
+if [[ $(((port_number < 49152) || (port_number > 65535))) = 1 ]]; then
+    errmsg "invalid IP port number ($option_arg)"
+    exit 10
+fi
+
+daemon_name=pidacsd$port_number
+daemon_file=/etc/init.d/$daemon_name
+port_names=${argument:-'gg0 gg1'}
+
+# Edit the daemon script to specify the correct defaults for the port_names
+# and the usr directory.  These defaults must be hard coded in the script
+# for use at startup because init.d executes pidacsd without any arguments.
+# Install the edited script in /etc/init.d, make it executable, and link it
+# for automatic startup on reboot.
+
+infomsg "option: installing daemon $y$t$daemon_name$n with port names $y$t'$port_names'$n"
+cp $pkg/pidacsd $daemon_file
+cmds="s|gg0 gg1|$port_names|;s|/usr/local|$PWD|;"
+sed -i "$cmds" $daemon_file
+chmod +x $daemon_file
+sudo update-rc.d $daemon_name defaults
+
+# Restart the PiDACS server daemon in the current boot session.
+
+$daemon_file restart
+exit_status=$?
+

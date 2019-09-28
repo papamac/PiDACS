@@ -772,7 +772,7 @@ class MCP482X:
 class IOMGR:
     """
     """
-    _PORTS = {'aa': (4, MCP342X),  'ab': (4, MCP342X),
+    _PORTS = {'aa': (4, MCP342X),  'ab': (8, MCP342X),
               'ad': (8, MCP320X),  'ae': (8, MCP320X),
               'da': (8, MCP482X),  'db': (8, MCP482X),
               'ga': (8, MCP230XX), 'gb': (8, MCP230XX),
@@ -796,7 +796,7 @@ class IOMGR:
                             help='string of port names to be processed')
         parser.add_argument('-i', '--interactive', action='store_true',
                             help='run in interactive mode from a terminal')
-        parser.add_argument('-I', '--IP_port',
+        parser.add_argument('-I', '--IP_port_number',
                             default=str(DEFAULT_PORT_NUMBER),
                             help='server IP port number')
         parser.add_argument('-l', '--log', action='store_true',
@@ -830,15 +830,17 @@ class IOMGR:
 
         if cls.args.log or cls.args.log_level:
             log_name = cls.name.lower()
-            dir_path = Path('/var/local/log/%s' % log_name)
-            dir_path.mkdir(exist_ok=True)  # Make directories if none exist.
-            file_path = dir_path / Path('%s.log' % log_name)
+            dir_path = Path('/var/local/log/' + log_name)
+            dir_path.mkdir(parents=True, exist_ok=True)
+            if log_name == 'pidacs':
+                log_name += cls.args.IP_port_number
+            log_path = dir_path / Path(log_name + '.log')
             try:
-                log_handler = TimedRotatingFileHandler(file_path,
+                log_handler = TimedRotatingFileHandler(log_path,
                                                        when='midnight')
             except OSError as err:
                 err_msg = ('error in opening "%s"; log option ignored'
-                           % file_path)
+                           % log_path)
                 cls.queue_message(ERROR, err_msg)
                 cls.queue_message(ERROR, err)
                 return

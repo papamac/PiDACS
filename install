@@ -1,23 +1,73 @@
-# Raspberry Pi Data Acquisition and Control System (PiDACS)
-
-# Install all PiDACS files in the correct locations, set executable bits and
-# create executable links.
-
-# The PiDACS source files and scripts are installed in the appropriate sub-
-# directories of the <usr> directory as specified by the USR_DIR environment
-# variable, or HOME if USR_DIR is not defined.  As part of the installation,
-# all source files are retained in <usr>/src/pidacs.
-
-# The files to be installed are assumed to be in a sub-directory named pidacs
-# in the current working directory.  If no PWD/pidacs sub-directory is found,
-# then existing files in <usr>/src/pidacs (if any) are installed.  If
-# PWD/pidacs exists and the working directory is not <usr>/src, then PWD/pidacs
-# is moved to <usr>/src and installed.
-
-# install has a single argument (port_names=$1).  If omitted, the script
-# installs all source files, but does not install, link, or start the server
-# daemon script (pidacsd).  This is appropriate if pidacs is to be executed
-# from the command line.
+###############################################################################
+#
+#     PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
+#        FILE:  install
+#       TITLE:  Install the PiDACS package
+#    FUNCTION:  Install PiDACS files in the current working drectory.
+#       USAGE:  source src/pidacs/install or p2pkg -i pidacs (see examples
+#               below).
+#      AUTHOR:  papamac
+#        DATE:  September 20, 2019
+#
+# DESCRIPTION:
+#
+# The install script installs scripts package files that have already been
+# downloaded to the src sub-directory of the current working directory.
+# Specifically, it copies src/scripts/bash_aliases to .bash_aliases in the HOME
+# directory; it marks the src/scripts/p2pkg file as executable; and it creates
+# a symbolic link to p2pkg in the bin sub-directory of the current working
+# directory.  Additionally, install creates HOME/bin if none exists.
+#
+# install is designed to be used with p2pkg.  Normally, the scripts package is
+# downloaded to the current working directory using ftp (-f) or git (-g) and
+# then installed (-i).  If scripts is to be installed in a root-owned
+# directory, p2pkg -i must be executed using sudo.  Usage examples are as
+# follows:
+#
+# p2pkg -fi scripts                     # Download the scripts package from the
+#                                         ftp server and install it in the
+#                                         HOME and current working directories.
+# cd /usr/local                         # Download the scripts package from
+# sudo -E p2pkg -gi scripts               github and install it in the HOME
+#                                         and /usr/local directories.
+#
+# DEPENDENCIES/LIMITATIONS:
+#
+# When running install via p2pkg in a sudo environment, sudo -E must be used to
+# preserve the user's HOME directory.  install checks for this and exits if
+# $HOME is /root.  papamac's runtime environment (see bash_aliases) prevents
+# this from hapening by aliasing sudo to sudo -E.
+#
+# DESCRIPTION:
+#
+# The install script installs PiDACS package files that have already been
+# downloaded to the src sub-directory of the current working directory.
+# Specifically, it marks the PiDACS executable files (iomgr.py, pic.py,
+# pidacs.py, and pidacsd) as executable and it creates symbolic links to these
+# executables in the bin sub-directory of the current working directory.
+# install does not install or start the PiDACS daemon.  Use the option script
+# to do this after install is complete.
+#
+# install is designed to be used with papamac's personal package utility
+# (p2pkg).  Normally, the PiDACS package is downloaded to the current working
+# directory using ftp (p2pkg -f) or git (p2pkg -g) and then installed
+# (p2pkg -i).  If PiDACS is to be installed in a root-owned directory, p2pkg -i
+# must be executed using sudo.  Usage examples are as follows:
+#
+# p2pkg -fi PiDACS                      # Download the PiDACS package from the
+#                                         ftp server and install it in the
+#                                         current working directory.
+# cd /usr/local                         # Download the PiDACS package from
+# sudo -E p2pkg -gi PiDACS                github and install it in /usr/local.
+#
+# DEPENDENCIES/LIMITATIONS:
+#
+# When running install via p2pkg in a sudo environment, sudo -E must be used to
+# preserve the user's HOME directory.  install checks for this and exits if
+# $HOME is /root.  papamac's runtime environment (see bash_aliases) prevents
+# this from hapening by aliasing sudo to sudo -E.
+#
+###############################################################################
 
 # If the port_names argument is specified, pidacsd is also installed, linked
 # for automatic startup on reboot, and started in the current boot session.
@@ -25,99 +75,12 @@
 # spaces, e.g., 'ab0 ab1 ga0 gb0'.  This string is edited into the pidacsd
 # script as the argument to the pidacs executable.
 
-# The install script is normally executed from <usr>/src.  Usage examples are
-# as follows:
-
-# <usr>/src/install           # Install PiDACS files and directories; do not
-#                               install the pidacsd or execute it.
-# <usr>/src/install 'ab0 ab1' # Install PiDACS files and pidacsd; link pidacsd
-#                               for automatic startup and start it using the
-#                               specified port_names.
-
-# install is also designed to be used with papamac's personal package usility
-# (p2pkg).  Normally, PiDACS is downloaded to the current working directory
-# using ftp (-f) or git (-g) and then installed.  Usage examples are as
-# follows:
-
-# p2pkg -fi PiDACS            # Download PiDACS from the ftp server and
-#                               install it in HOME.
-# sudo -E p2pkg -u /usr/local -gI 'ga0 gb0' PiDACS  # Download PiDACS from
-#                               github and install it in /usr/local; install
-#                               and start pidacsd using ports ga0 and gb0.
-
-# Set directory and argument variables.
-
-if [ $XTRACE ]; then
-    set -x
-fi
-usr=${USR_DIR:-~}             # <usr> directory.
-if [ $usr == /root ]; then
-    echo 'install: usr directory is /root; use sudo -E to preserve the user environment'
-    exit 1
-fi
-bin=$usr/bin                  # <bin> directory.
-src=$usr/src                  # <src> directory.
-p=$src/pidacs                 # PiDACS source directory in <src>.
-var=/var/local                # <var> directory.
-log=$var/log                  # <log> directory.
-port_names=$1                 # port_names argument.
-
-# If the current working directory contains a pidacs sub-directory and it is
-# not the <src> directory, then move the new pidacs sub-directory to <src> for
-# use in the installation.
-
-if [ -d pidacs ]; then
-    if [ $PWD != $src ]; then
-        echo "install: Moving $PWD/pidacs to $src"
-        mkdir -p $src
-        rm -fr $p
-        mv pidacs $src
-    fi
-fi
-
 # Install files in the <src>/pidacs directory by setting executable bits and
 # creating executable links.
 
-if [ -d $p ]; then
-    echo "install: Installing PiDACS files, directories, and links in $usr"
-    chmod +x $p/install   $p/pidacsd  $p/remove
-    chmod +x $p/iomgr.py  $p/pic.py   $p/pidacs.py
-    ln -fs   $p/iomgr.py  $bin/iomgr
-    ln -fs   $p/pic.py    $bin/pic
-    ln -fs   $p/pidacs.py $bin/pidacs
-else
-    echo 'install: pidacs source directory not found'
-    exit 1
-fi
-
-# Create a <log> directory for iomgr and pidacs log files.  Set the group to
-# adm with write access for group members.
-
-sudo mkdir -p $log
-sudo chgrp adm $log
-sudo chmod g+w $log
-
-# If the port_names argument is specified, install and start the pidacsd script
-# using the specified port_names.
-
-if [ "$port_names" ]; then
-    echo "install: Installing the PiDACS server daemon with port names '$port_names'"
-
-    # Stop the PiDACS server daemon if it is running.
-
-    killall -q pidacs
-
-    # Edit the daemon script to specify the correct defaults for the port_names
-    # and the usr directory.  These defaults must be hard coded in the script
-    # for use at startup because init.d executes pidacsd without any arguments.
-    # Install the edited script in /etc/init.d and make it executable.
-
-    cmds="s|gg0 gg1|$port_names|;s|/usr/local|$usr|;"
-    sed "$cmds" $p/pidacsd | sudo tee /etc/init.d/pidacsd > /dev/null
-    sudo chmod +x /etc/init.d/pidacsd
-
-    # Link the pidacs daemon script and start it.
-
-    sudo update-rc.d pidacsd defaults
-    /etc/init.d/pidacsd start
-fi
+infomsg "install: creating PiDACS executable links in $y$t$bin$n"
+chmod +x $pkg/iomgr.py  $pkg/pic.py $pkg/pidacs.py $pkg/pidacsd
+ln -fs   $pkg/iomgr.py  $bin/iomgr
+ln -fs   $pkg/pic.py    $bin/pic
+ln -fs   $pkg/pidacs.py $bin/pidacs
+ln -fs   $pkg/pidacsd   $bin/pidacsd

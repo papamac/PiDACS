@@ -10,24 +10,168 @@
 # Description:        PiDACS server
 ### END INIT INFO
 
-# Raspberry Pi Data Acquisition and Control System (PiDACS)
+###############################################################################
+#
+#     PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
+#        FILE:  pidacsd
+#       TITLE:  PiDACS server daemon script (pidacsd)
+#    FUNCTION:  start, stop, or restart an instance of the PiDACS server
+#               daemon.
+#       USAGE:  source src/pidacs/install or p2pkg -i pidacs (see examples
+#               below).
+#      AUTHOR:  papamac
+#        DATE:  September 22, 2019
+#
+# DESCRIPTION:
+#
+# ******* needs work *******
+#
+###############################################################################
 
-# PiDACS server daemon script (pidacsd).
+# Define daemon variables and functions.
 
-cmd=$1
-port_names=${2:-'gg0 gg1'}
-usr=${3:-/usr/local}
-bin=${usr}/bin
+n=$'\e[0m'                              # Reset all attributes (normal).
+t=$'\e[1m'                              # Set character attribute to bright.
+r=$'\e[31m'                             # Set foreground color to red.
+g=$'\e[32m'                             # Set foreground color to green.
+daemon_file=$0                          # Full path name to daemon file.
+daemon_name=${daemon_file##*/}          # Last segment of path name.
+pidfile=/var/run/$daemon_name.pid       # PID file.
 
-case $cmd in
-    start)
-        $bin/pidacs -L DATA "$port_names" 2>&1 & ;;
-    stop)
-        killall -q pidacs ;;
-    restart)
-        killall -q pidacs
-        $bin/pidacs -l "$port_names" 2>&1 & ;;
-    *)
-        echo "pidacsd: usage: sudo /etc/init.d/pidacsd {start|stop|restart} ['port_names'] [usr dir]"
-        exit 1 ;;
-esac
+function errmsg { echo "$n$r$t$daemon_name: $1$n" >&2; }
+function infomsg { echo "$daemon_name: $1"; }
+
+function status {
+    echo
+    infomsg "statusing daemon $y$t$daemon_name${n}..."
+    infomsg "   daemon file:  $y$t$daemon_file$n"
+    infomsg "      PID file:  $y$t$pidfile$n"
+    infomsg "  program name:  $y${t}pidacs$n"
+    start-stop-daemon \
+        --quiet \
+        --status \
+        --pidfile $pidfile 2>&1
+    exit_status=$?
+    case $exit_status in
+        0) infomsg "   exit status:  $g${t}daemon is running ($exit_status)$n" ;;
+        1) errmsg  "   exit status:  daemon not running, but PID file exists ($exit_status)" ;;
+        2) errmsg  "   exit status:  daemon not running ($exit_status)" ;;
+        ?) errmsg  "   exit status:  unknown status ($exit_status)" ;;
+    esac
+}
+
+function start {
+    program_file=/usr/local/bin/pidacs  # Executable program file (full path).
+                                        #   usr/local segment may be edited
+                                        #   by the option script.
+    port_number=${daemon_name##*[a-z]}  # IP port number from daemon name.
+    port_names='gg0 gg1'                # Default port names.  'gg0 gg1' may
+                                        #   be edited by the option script.
+    echo
+    infomsg "starting daemon $y$t$daemon_name${n}..."
+    infomsg "   daemon file:  $y$t$daemon_file$n"
+    infomsg "      PID file:  $y$t$pidfile$n"
+    infomsg "  program file:  $y$t$program_file$n"
+    infomsg "   port number:  $y$t$port_number$n"
+    infomsg "    port names:  $y$t'$port_names'$n"
+    start-stop-daemon \
+        --quiet \
+        --start \
+        --background \
+        --make-pidfile \
+        --pidfile $pidfile \
+        --startas $program_file \
+        -- -L DATA -I  $port_number "$port_names" 2>&1
+    exit_status=$?
+    case $exit_status in
+        0) infomsg "   exit status:  $g${t}daemon started ($exit_status)$n" ;;
+        1) errmsg  "   exit status:  daemon already running ($exit_status)" ;;
+        ?) errmsg  "   exit status:  unknown error ($exit_status)" ;;
+    esac
+}
+
+function stop {
+    echo
+    infomsg "stopping daemon $y$t$daemon_name${n}..."
+    infomsg "   daemon file:  $y$t$daemon_file$n"
+    infomsg "      PID file:  $y$t$pidfile$n"
+    infomsg "  program name:  $y${t}pidacs$n"
+    start-stop-daemon \
+        --quiet \
+        --stop \
+        --retry 5 \
+        --pidfile $pidfile \
+        --remove-pidfile 2>&1
+    exit_status=$?
+    case $exit_status in
+        0) infomsg "   exit status:  $g${t}daemon stopped ($exit_status)$n" ;;
+        1) errmsg  "   exit status:  daemon already stopped ($exit_status)" ;;
+        2) errmsg  "   exit status:  daemon not stopped after retry ($exit_status)" ;;
+        ?) errmsg  "   exit status:  unknown error ($exit_status)" ;;
+    esac
+}
+
+# Go do it ...
+
+if [[ $daemon_name == "pidacsd" ]]; then
+
+    # The daemon name has no IP port number.  Get a port number from the -I
+    # option (or default) and use it to execute a previously edited/installed
+    # version of this script (if any) in /etc/init.d.
+
+    # Parse arguments and check for errors.
+
+    usage="usage: pidacsd [-h][-I IP port number] {status|start|stop|restart}"
+    declare -i port_number=50000        # Default IP port number.
+    while getopts ':hI:' opt; do
+        case $opt in
+            h) echo "$usage"
+               exit 0 ;;
+            I) port_number=${OPTARG:-$port_number} ;;
+            ?) errmsg "unrecognized option $1"
+               echo "$usage"
+               exit 10 ;;
+        esac
+    done
+    if [[ $(((port_number < 49152) || (port_number > 65535))) = 1 ]]; then
+        errmsg "invalid IP port number ($port_number)"
+        exit 10
+    fi
+    shift $(($OPTIND - 1))
+    cmd=$1
+    if [[ ! $cmd ]]; then
+        errmsg "missing command"
+        echo "$usage"
+        exit 10
+    fi
+
+    # Execute previously installed daemon.
+
+    installed_daemon=/etc/init.d/pidacsd$port_number
+    if [[ -f $installed_daemon ]]; then
+        $installed_daemon $cmd
+        exit_status=$?
+        echo
+    else
+        errmsg "$installed_daemon: file not found"
+        exit_status=10
+    fi
+
+else
+
+    # The daemon name includes an IP port number, so it must have been
+    # previously edited and installed by the option script.  Execute the
+    # status, start, stop, or restart command within this script.
+
+    cmd=$1
+    case $cmd in
+        status)  status ;;
+        start)   start ;;
+        stop)    stop ;;
+        restart) stop; start ;;
+        *)       errmsg "unrecognized command ($cmd)"
+                 echo "usage: $daemon_name {status|start|stop|restart}"
+                 exit_status=10 ;;
+    esac
+fi
+exit $exit_status

@@ -1,3 +1,39 @@
+###############################################################################
+#
+#     PACKAGE:  papamac's bash scripts and runtime environment (scripts)
+#        FILE:  remove
+#       TITLE:  Remove the scripts package
+#    FUNCTION:  Restore system files to their state before any installations
+#               by the install or option scripts.
+#       USAGE:  source src/scripts/remove or p2pkg -r scripts (see examples
+#               below).
+#      AUTHOR:  papamac
+#        DATE:  September 22, 2019
+#
+# DESCRIPTION:
+#
+# The remove script removes all scripts files from the HOME and current working
+# directories.  It also restores the original afp.conf file (if any) in
+# /etc/netatalk.
+#
+# remove is designed to be used with p2pkg.  Usage examples are as follows:
+#
+# sudo -E p2pkg -r scripts              # Remove the scripts package from the
+#                                         HOME and current working directories
+#                                         and restore /etc/netatalk/afp.conf.
+# cd /usr/local                         # Remove the scripts package from the
+# sudo -E p2pkg -ru /usr/local scripts    HOME and /usr/local directories and
+#                                         restore /etc/netatalk/afp.conf.
+#
+# DEPENDENCIES/LIMITATIONS:
+#
+# Because it changes files and directories owned by root, p2pkg -r must be
+# executed using sudo.  Also, sudo -E must be used to preserve the user's HOME
+# directory.  remove checks for this and exits if $HOME is /root.  papamac's
+# runtime environment (see bash_aliases) prevents this from hapening by
+# aliasing sudo to sudo -E.
+#
+###############################################################################
 # Raspberry Pi Data Acquisition and Control System (PiDACS)
 
 # Remove all PiDACS components and stop the PiDACS server daemon, if running.
@@ -20,29 +56,24 @@
 
 # Set directory variables.
 
-if [ $XTRACE ]; then
-    set -x
-fi
-usr=${USR_DIR:-~}                   # <usr> directory.
-if [ $usr == /root ]; then
-    echo 'install: usr directory is /root; use sudo -E to preserve the user environment'
-    exit 1
-fi
-bin=$usr/bin                        # <bin> directory.
-src=$usr/src                        # <src> directory.
-var=/var/local                      # <var> directory.
-log=$var/log                        # <log> directory.
+log=/var/local/log                        # log directory.
 
 # Remove PiDACS files.
 
-echo "remove: Removing PiDACS files and directories from $usr"
-rm -f $bin/iomgr $bin/pic $bin/pidacs
-rm -fr $src/pidacs
+infomsg "remove: removing PiDACS files and directories from $y$t$PWD$n"
+rm -f $bin/iomgr $bin/pic $bin/pidacs $bin/pidacsd
+rm -fr $pkg
 rm -fr $log/iomgr
 rm -fr $log/pidacs
 
-# Stop PiDACS daemon and remove the daemon script/link.
+# Stop all PiDACS daemons and remove the daemon scripts/links.
 
-sudo killall -q pidacs
-sudo rm -f /etc/init.d/pidacsd
-sudo update-rc.d pidacsd remove
+infomsg "remove: stopping daemons and removing files in $y$t/etc/init.d$n"
+for daemon_file in /etc/init.d/pidacsd*; do
+    if [[ -f $daemon_file ]]; then
+        $daemon_file stop
+        rm -f $daemon_file
+        update-rc.d $daemon_file remove
+    fi
+done
+rm -f /var/run/pidacsd*.pid
