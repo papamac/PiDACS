@@ -23,36 +23,30 @@ SOFTWARE.
 
 DESCRIPTION
 
-Non-blocking console input (nbi)
-
 """
 __author__ = 'papamac'
 __version__ = '1.0.0'
 __date__ = 'December 12, 2019'
 
 
-from queue import *
-from threading import Thread
+# ASCII escape sequences for text attributes and colors:
+
+NORMAL = '\033[0m'
+BRIGHT = '\033[1m'
+REVERSE = '\033[7m'
+
+RED = '\033[31m'
+GREEN = '\033[32m'
+YELLOW = '\033[33m'
+BLUE = '\033[34m'
+
+BRED = BRIGHT + RED
+BGREEN = BRIGHT + GREEN
+BYELLOW = BRIGHT + YELLOW
+BBLUE = BRIGHT + BLUE
 
 
-class NBI:
+# colortext function:
 
-    _queue = Queue()
-
-    @classmethod
-    def start(cls):
-        _nbi = Thread(name='nbi', target=cls._run, daemon=True)
-        _nbi.start()
-
-    @classmethod
-    def get_input(cls):
-        try:
-            data = cls._queue.get(timeout=1)
-        except Empty:
-            data = None
-        return data
-
-    @classmethod
-    def _run(cls):
-        while True:
-            cls._queue.put(input())
+def ct(attribute, text):
+    return attribute + text + NORMAL

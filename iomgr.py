@@ -48,34 +48,28 @@ BCM2835,6,7  Raspberry Pi Extended GPIO           1     gg1, gp1     9
  MCP4822*    2-Channel 12-Bit D/A Converter       8?       db        2
 
  * Implementation in progress.
+
 """
-
 __author__ = 'papamac'
-__version__ = '0.9.7'
-__date__ = 'August 14, 2019'
+__version__ = '1.0.0'
+__date__ = 'December 12, 2019'
 
-from argparse import ArgumentParser
 from datetime import datetime
 from logging import DEBUG, INFO, WARNING, ERROR
-from logging import addLevelName, Formatter, getLogger, StreamHandler
-from logging.handlers import TimedRotatingFileHandler
 from math import fabs, log2
-from pathlib import Path
 from queue import *
-from sys import argv
 from threading import Thread
 from time import sleep
 
+from argsandlogs import AL, DATA
+from colortext import *
 from i2cbus import I2CBUS
 from nbi import NBI
-from pidacs_global import DATA
-from pidacs_global import MESSAGE_LENGTH, DATETIME_LENGTH, DEFAULT_PORT_NUMBER
 import RPi.GPIO as GPIO
 
 
 # Module iomgr global constants:
 
-DEFAULT_PORT_NAMES = 'gg0 gg1'  # ports for Raspberry Pi built-in GPIO.
 STATUS_INTERVAL = 600       # Interval for port status reporting (sec).
 
 # Channel configuration constants are used to specify the operational
@@ -257,17 +251,17 @@ class Port(Thread):
         if attr is None:  # Not a method or attribute for this channel.
             warning = ('request id "%s" is not valid for channel "%s"; '
                        'request ignored' % (request_id, channel.id))
-            IOMGR.queue_message(WARNING, warning)
+            IOMGR.queue_message(WARNING, ct(BYELLOW, warning))
         else:  # request_id is a valid attribute or method for this channel.
             if hasattr(attr, '__call__'):  # It is a method; call it.
                 try:
                     attr() if argument is None else attr(argument)
-                except OSError as err:
-                    err_msg = ('error in calling "%s" method for '
-                               'channel "%s"; state unknown'
-                               % (request_id, channel.id))
-                    IOMGR.queue_message(ERROR, err_msg)
-                    IOMGR.queue_message(ERROR, err)
+                except OSError as oserr:
+                    err = ('error %s in calling "%s" method for '
+                           'channel "%s" %s; state unknown'
+                           % (oserr.errno, request_id, channel.id,
+                              oserr.strerror))
+                    IOMGR.queue_message(ERROR, ct(BRED, err))
             else:  # It is an attribute; set value to argument.
                 setattr(channel, request_id, argument)
 
@@ -276,12 +270,12 @@ class Port(Thread):
             if channel.change or channel.interval:
                 try:
                     value = channel.read_hw()
-                except OSError as err:
+                except OSError as oserr:
                     self._running = False
-                    err_msg = ('polling read error on channel "%s"; port '
-                               '"%s" stopped' % (channel.id, self.name))
-                    IOMGR.queue_message(ERROR, err_msg)
-                    IOMGR.queue_message(ERROR, err)
+                    err = ('polling read error %s on channel "%s" %s; '
+                           'port "%s" stopped' % (oserr.errno, channel.id,
+                                                  oserr.strerror, self.name))
+                    IOMGR.queue_message(ERROR, ct(BRED, err))
                     value = '!ERROR'
                 channel.prior_value = channel.value
                 channel.value = value
@@ -345,7 +339,7 @@ class Channel:
         ok = bitval in (0, 1)
         if not ok:
             warning = 'invalid bit value "%s"; request ignored' % bitval
-            IOMGR.queue_message(WARNING, warning)
+            IOMGR.queue_message(WARNING, ct(BYELLOW, warning))
         return ok
 
     def _check_direction(self, direction):
@@ -353,7 +347,7 @@ class Channel:
         if not ok:
             warning = ('channel "%s" not configured for %s; request ignored'
                        % (self.id, ('output', 'input')[direction]))
-            IOMGR.queue_message(WARNING, warning)
+            IOMGR.queue_message(WARNING, ct(BYELLOW, warning))
         return ok
 
     def _momentary(self, delay):
@@ -551,12 +545,11 @@ class MCP230XX(Port):
         try:
             self._gpio.read()
             changes = self._gpio.value ^ self._gpio.prior_value
-        except OSError as err:
+        except OSError as oserr:
             self._running = False
-            err_msg = ('polling read error on port "%s"; port stopped'
-                       % self.name)
-            IOMGR.queue_message(ERROR, err_msg)
-            IOMGR.queue_message(ERROR, err)
+            err = ('polling read error %s on port "%s" %s; port stopped'
+                   % (oserr.errno, self.name, oserr.strerror))
+            IOMGR.queue_message(ERROR, ct(BRED, err))
             changes = 0xff
         for channel in self._channels:
             mask = 1 << channel.number
@@ -781,105 +774,15 @@ class IOMGR:
     _queue = Queue()
     _gpio_cleanup = False
     running = False
-    name = None
-    args = None
-    log = None
-
-    @classmethod
-    def init(cls):
-        """
-        Parse command line arguments and initialize printing/logging for main
-        programs using the IOMGR class.
-        """
-        parser = ArgumentParser()
-        parser.add_argument('port_names', nargs='?',
-                            help='string of port names to be processed')
-        parser.add_argument('-i', '--interactive', action='store_true',
-                            help='run in interactive mode from a terminal')
-        parser.add_argument('-I', '--IP_port_number',
-                            default=str(DEFAULT_PORT_NUMBER),
-                            help='server IP port number')
-        parser.add_argument('-l', '--log', action='store_true',
-                            help='log data and status to a file in '
-                                 '/var/log/piDACS')
-        parser.add_argument('-L', '--log_level',
-                            choices=['DEBUG', 'DATA', 'INFO', 'WARNING',
-                                     'ERROR', 'CRITICAL'],
-                            help='logging level for optional file logging')
-        parser.add_argument('-p', '--print', action='store_true',
-                            help='print data and status to sys.stdout')
-        parser.add_argument('-P', '--print_level',
-                            choices=['DEBUG', 'DATA', 'INFO', 'WARNING',
-                                     'ERROR', 'CRITICAL'],
-                            help='logging level for optional printing')
-        cls.name = parser.prog.replace('.py', '')
-        cls.args = parser.parse_args()
-
-        addLevelName(DATA, 'DATA')
-
-        cls.log = getLogger(cls.name)
-        cls.log.setLevel(DEBUG)
-
-        if cls.args.print or cls.args.print_level:
-            print_handler = StreamHandler()
-            level = cls.args.print_level if cls.args.print_level else 'INFO'
-            print_handler.setLevel(level)
-            print_formatter = Formatter('%(message)s')
-            print_handler.setFormatter(print_formatter)
-            cls.log.addHandler(print_handler)
-
-        if cls.args.log or cls.args.log_level:
-            log_name = cls.name.lower()
-            dir_path = Path('/var/local/log/' + log_name)
-            dir_path.mkdir(parents=True, exist_ok=True)
-            if log_name == 'pidacs':
-                log_name += cls.args.IP_port_number
-            log_path = dir_path / Path(log_name + '.log')
-            try:
-                log_handler = TimedRotatingFileHandler(log_path,
-                                                       when='midnight')
-            except OSError as err:
-                err_msg = ('error in opening "%s"; log option ignored'
-                           % log_path)
-                cls.queue_message(ERROR, err_msg)
-                cls.queue_message(ERROR, err)
-                return
-            else:
-                level = cls.args.log_level if cls.args.log_level else 'INFO'
-                log_handler.setLevel(level)
-                log_formatter = Formatter(
-                    '%(asctime)s %(levelname)s %(message)s')
-                log_handler.setFormatter(log_formatter)
-                cls.log.addHandler(log_handler)
 
     @classmethod
     def start(cls):
         """
         Start IOMGR ports.
         """
-        # Reconstruct the argument string from argv[1:].
-
-        argstr = ''
-        for arg in argv[1:]:
-            if ' ' in arg:
-                arg = "'%s'" % arg
-            argstr = argstr + arg + ' '
-        cls.queue_message(INFO, 'starting %s with options %s'
-                          % (cls.name, argstr))
-
-        # Get port names list from the command line argument or the
-        # DEFAULT_PORT_NAMES if no argument is specified.
-
-        port_names = cls.args.port_names
-        if not port_names:
-            warning = ('no port name(s) in the command line; defaults used')
-            cls.queue_message(WARNING, warning)
-            port_names = DEFAULT_PORT_NAMES
-        port_names = port_names.replace(',', '').lower().split()
-
         # Check port names and instantiate/start valid ports.
 
-        for port_name in port_names:
+        for port_name in AL.args.port_names:
             if len(port_name) == 3 and port_name[2].isdecimal():
                 port_type = port_name[:2]
                 num = int(port_name[2])
@@ -894,27 +797,26 @@ class IOMGR:
                         if port.name in (port_name, alt_port_name):
                             break
                     else:
-                        cls.queue_message(INFO, 'starting port "%s"'
-                                          % port_name)
+                        info = 'starting port "%s"' % port_name
+                        cls.queue_message(INFO, ct(BGREEN, info))
                         try:
                             port = cls._PORTS[port_type][1](port_name)
                             port.start()
-                        except OSError as err:
-                            err_msg = ('I/O error on port "%s"; startup '
-                                       'aborted' % port_name)
-                            cls.queue_message(ERROR, err_msg)
-                            cls.queue_message(ERROR, '%s' % err)
+                        except OSError as oserr:
+                            err = ('error %s on port "%s" %s; startup aborted'
+                                   % (oserr.errno, port_name, oserr.strerror))
+                            cls.queue_message(ERROR, ct(BRED, err))
                         if port_type in ('gg', 'gp'):
                             cls._gpio_cleanup = True
                         continue
-            warning = ('invalid or duplicate port name "%s"; port not started'
-                       % port_name)
-            cls.queue_message(WARNING, warning)
+            err = ('invalid or duplicate port name "%s"; port not started'
+                   % port_name)
+            cls.queue_message(WARNING, ct(BRED, err))
         if Port.ports:
             cls.running = True
         else:
-            err = 'no port(s) started; %s terminated' % cls.name
-            cls.queue_message(ERROR, err)
+            err = 'no port(s) started; %s terminated' % AL.name
+            cls.queue_message(ERROR, ct(BRED, err))
 
     @classmethod
     def stop(cls):
@@ -928,16 +830,16 @@ class IOMGR:
         try:
             message = cls._queue.get(timeout=1)
         except Empty:
-            message = b''
-        return message.decode().strip()
+            message = ''
+        return message
 
     @classmethod
     def queue_message(cls, level, *args):
-        message = '%s %s' % (str(datetime.now()), level)
+        message = ''
         for arg in args:
-            message += ' %s' % arg
-        cls._queue.put(message.ljust(MESSAGE_LENGTH).encode()[:MESSAGE_LENGTH])
-        cls.log.log(level, message[DATETIME_LENGTH + 4:])
+            message += '%s ' % arg
+        cls._queue.put('%02i%s' % (level, message))
+        AL.log.log(level, message)
 
     @classmethod
     def process_request(cls, request):
@@ -951,14 +853,14 @@ class IOMGR:
 
         if nsplit not in (2, 3):
             warning = 'invalid syntax; request ignored'
-            cls.queue_message(WARNING, warning)
+            cls.queue_message(WARNING, ct(BYELLOW, warning))
             return
 
         channel_name = rsplit[0]
         channel = Channel.channels.get(channel_name)
         if channel is None:
             warning = 'channel "%s" not found; request ignored' % channel_name
-            cls.queue_message(WARNING, warning)
+            cls.queue_message(WARNING, ct(BYELLOW, warning))
             return
 
         request_id = rsplit[1]
@@ -973,7 +875,7 @@ class IOMGR:
                 break
         else:
             warning = 'invalid request id "%s"; request ignored' % request_id
-            cls.queue_message(WARNING, warning)
+            cls.queue_message(WARNING, ct(BYELLOW, warning))
             return
 
         argument = None
@@ -998,7 +900,7 @@ class IOMGR:
                     break
         else:
             warning = 'invalid argument "%s"; request ignored' % argument
-            cls.queue_message(WARNING, warning)
+            cls.queue_message(WARNING, ct(BYELLOW, warning))
             return
 
         # Valid request; queue it to the appropriate port thread for concurrent
@@ -1018,18 +920,19 @@ class IOMGR:
 # IOMGR main program:
 
 if __name__ == '__main__':
-    IOMGR.init()
+    AL.parser.add_argument('port_names', nargs='+',
+                           help='string of IO port names separated by spaces')
+    AL.parser.add_argument('-P', '--port_number',
+                           help='%s port number' % AL.name)
+    AL.start()
     IOMGR.start()
-    interactive = IOMGR.args.interactive and IOMGR.running
-    if interactive:
+    if IOMGR.running:
         NBI.start()
-        IOMGR.log.setLevel(DEBUG)
-        IOMGR.log.info('Begin Interactive Session')
-        IOMGR.log.info('Enter requests: channel_name request_id argument '
-                       'or quit')
-    try:
-        while IOMGR.running:
-            if interactive:
+        AL.log.info(ct(BBLUE, '\nstarting %s interactive session'
+                              '\nenter requests: [channel_name request_id '
+                              'argument] or [quit]' % AL.name))
+        try:
+            while IOMGR.running:
                 user_request = NBI.get_input()
                 if user_request is None:
                     continue
@@ -1037,8 +940,7 @@ if __name__ == '__main__':
                     IOMGR.running = False
                     continue
                 IOMGR.process_request(user_request)
-    except KeyboardInterrupt:
-        pass
-    IOMGR.stop()
-    if interactive:
-        IOMGR.log.info('End Interactive Session')
+        except KeyboardInterrupt:
+            pass
+        IOMGR.stop()
+    AL.log.info(ct(BBLUE, 'ending %s' % AL.name))

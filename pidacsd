@@ -81,7 +81,7 @@ function start {
         --make-pidfile \
         --pidfile $pidfile \
         --startas $program_file \
-        -- -L DATA -I  $port_number "$port_names" 2>&1
+        -- -l -L DATA -I $port_number $port_names 2>&1
     exit_status=$?
     case $exit_status in
         0) infomsg "   exit status:  $g${t}daemon started ($exit_status)$n" ;;

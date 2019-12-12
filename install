@@ -42,9 +42,9 @@
 #
 # The install script installs PiDACS package files that have already been
 # downloaded to the src sub-directory of the current working directory.
-# Specifically, it marks the PiDACS executable files (iomgr.py, pic.py,
-# pidacs.py, and pidacsd) as executable and it creates symbolic links to these
-# executables in the bin sub-directory of the current working directory.
+# Specifically, it marks the PiDACS executable files (iomgr.py, pidacs-c.py,
+# pidacs-s.py, and pidacsd) as executable and it creates symbolic links to
+# these executables in the bin sub-directory of the current working directory.
 # install does not install or start the PiDACS daemon.  Use the option script
 # to do this after install is complete.
 #
@@ -79,8 +79,8 @@
 # creating executable links.
 
 infomsg "install: creating PiDACS executable links in $y$t$bin$n"
-chmod +x $pkg/iomgr.py  $pkg/pic.py $pkg/pidacs.py $pkg/pidacsd
-ln -fs   $pkg/iomgr.py  $bin/iomgr
-ln -fs   $pkg/pic.py    $bin/pic
-ln -fs   $pkg/pidacs.py $bin/pidacs
-ln -fs   $pkg/pidacsd   $bin/pidacsd
+chmod +x $pkg/iomgr.py  $pkg/pidacs-c.py $pkg/pidacs-s.py $pkg/pidacsd
+ln -fs   $pkg/iomgr.py    $bin/iomgr
+ln -fs   $pkg/pidacs-c.py $bin/pidacs-c
+ln -fs   $pkg/pidacs-s.py $bin/pidacs-s
+ln -fs   $pkg/pidacsd     $bin/pidacsd

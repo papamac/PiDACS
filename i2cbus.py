@@ -25,8 +25,8 @@ DESCRIPTION
 
 """
 __author__ = 'papamac'
-__version__ = '0.9.0'
-__date__ = 'April 12, 2018'
+__version__ = '1.0.0'
+__date__ = 'December 12, 2019'
 
 from smbus import SMBus
 
@@ -38,7 +38,9 @@ def _get_raspberry_pi_revision():
                 return line[line.index(':') + 1:].strip()
     raise RuntimeError('No Raspberry Pi revision found.')
 
+
 def _get_i2c_revision():
     return 0 if _get_raspberry_pi_revision() in ('0002', '0003') else 1
+
 
 I2CBUS = SMBus(_get_i2c_revision())
