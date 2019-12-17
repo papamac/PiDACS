@@ -8,7 +8,7 @@
 #       USAGE:  source src/scripts/remove or p2pkg -r scripts (see examples
 #               below).
 #      AUTHOR:  papamac
-#        DATE:  September 22, 2019
+#        DATE:  December 12, 2019
 #
 # DESCRIPTION:
 #
@@ -61,10 +61,11 @@ log=/var/local/log                        # log directory.
 # Remove PiDACS files.
 
 infomsg "remove: removing PiDACS files and directories from $y$t$PWD$n"
-rm -f $bin/iomgr $bin/pic $bin/pidacs $bin/pidacsd
+rm -f $bin/iomgr $bin/pidacs-c $bin/pidacs-s $bin/pidacsd
 rm -fr $pkg
 rm -fr $log/iomgr
-rm -fr $log/pidacs
+rm -fr $log/pidacs-c
+rm -fr $log/pidacs-s
 
 # Stop all PiDACS daemons and remove the daemon scripts/links.
 

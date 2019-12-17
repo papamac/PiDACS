@@ -27,10 +27,11 @@ DESCRIPTION
 
 """
 __author__ = 'papamac'
-__version__ = '0.9.7'
+__version__ = '1.0.0'
 __date__ = 'December 12, 2019'
 
 
+from logging import getLogger
 from signal import signal, SIGTERM
 from socket import *
 from threading import Thread
@@ -40,6 +41,11 @@ from colortext import *
 from iomgr import IOMGR
 from messagesocket import MessageSocket, SOCKET_TIMEOUT
 from nbi import NBI
+
+
+# Globals:
+
+LOG = getLogger('Plugin.pidacs-s')
 
 
 class Server:
@@ -53,28 +59,21 @@ class Server:
 
     @classmethod
     def start(cls):
-        IOMGR.start()
-        if IOMGR.running:
-
-            # Start server operations.
-
-            cls._accept = Thread(name='accept_client_connections',
-                                 target=cls._accept_client_connections)
-            cls._serve = Thread(name='serve_clients',
-                                target=cls._serve_clients)
-            cls.running = True
-            cls._accept.start()
-            cls._serve.start()
-            signal(SIGTERM, cls.terminate)
+        cls._accept = Thread(name='accept_client_connections',
+                             target=cls._accept_client_connections)
+        cls._serve = Thread(name='serve_clients',
+                            target=cls._serve_clients)
+        cls.running = True
+        cls._accept.start()
+        cls._serve.start()
+        signal(SIGTERM, cls.terminate)
 
     @classmethod
     def stop(cls):
-        if IOMGR.running:
-            for client in cls._clients:
-                client.stop()
-            cls._accept.join()
-            cls._serve.join()
-            IOMGR.stop()
+        for client in cls._clients:
+            client.stop()
+        cls._accept.join()
+        cls._serve.join()
 
     @classmethod
     def terminate(cls, *args):
@@ -89,15 +88,16 @@ class Server:
         cls._socket.listen(5)
         ipv4, port = cls._socket.getsockname()
         name = '%s[%s:%s]' % (gethostname(), ipv4, port)
-        AL.log.info(ct(BGREEN, 'accepting client connections "%s"' % name))
+        LOG.info(ct(BGREEN, 'accepting client connections "%s"' % name))
         while cls.running:
             try:
                 client_socket, client_address_tuple = cls._socket.accept()
             except timeout:
                 continue
-            client = MessageSocket('', client_socket, IOMGR.process_request)
-            client.name = client.recv() + client.name
-            AL.log.info(ct(BGREEN, 'connected "%s"' % client.name))
+            client = MessageSocket('', client_socket,
+                                   process_message=IOMGR.process_request)
+            client.update_name(client.recv() + client.name)
+            LOG.info(ct(BGREEN, 'connected "%s"' % client.name))
             client.start()
             cls._clients.append(client)
 
@@ -121,24 +121,25 @@ AL.parser.add_argument('-d', '--daemon', action='store_true',
                        help='daemon server: interactive requests and printing '
                        'disabled; file logging enabled')
 AL.start()
-Server.start()
-if Server.running:
+IOMGR.start()
+if IOMGR.running:
+    Server.start()
     if not AL.args.daemon:
         NBI.start()
-        AL.log.info(ct(BBLUE, '\nstarting %s interactive session'
-                              '\nenter requests: [channel_name request_id '
-                              'argument] or [quit]' % AL.name))
+        LOG.info(ct(BBLUE, 'starting %s interactive session'
+                           '\nenter requests: [channel_name request_id '
+                           'argument] or [quit]' % AL.name))
     try:
         while Server.running:
             if not AL.args.daemon:
                 user_request = NBI.get_input()
-                if user_request is None:
-                    continue
-                if user_request and 'quit'.startswith(user_request.lower()):
-                    Server.running = False
-                    continue
-                IOMGR.process_request(user_request)
+                if user_request:
+                    if 'quit'.startswith(user_request.lower()):
+                        Server.running = False
+                    else:
+                        IOMGR.process_request(user_request)
     except KeyboardInterrupt:
         pass
     Server.stop()
-AL.log.info(ct(BBLUE, 'ending %s' % AL.name))
+    IOMGR.stop()
+AL.stop()

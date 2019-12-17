@@ -39,8 +39,11 @@ from colortext import *
 
 # Global constants:
 
+LOG = getLogger('Plugin')
+
 THREAD_DEBUG = 5
 DATA = 15
+
 DYNAMIC_PORT_RANGE = range(49152, 65535)  # Range of valid dynamic ports.
 DEFAULT_PORT_NUMBER = 52000   # Arbitrary selection from DYNAMIC_PORT_RANGE.
 
@@ -51,13 +54,12 @@ class AL:
     parser = ArgumentParser()
     name = parser.prog.replace('.py', '')
     args = None
-    log = None
 
     @classmethod
     def start(cls):
-        """
-        Parse command line arguments and initialize printing/logging.
-        """
+        # Parse command line arguments, initialize printing/logging and log
+        # main program starting message.
+
         # printing (-p) defaults to 'DATA' and logging (-l) defaults to None
         # if they are omitted from the command line.  If the daemon option (-d)
         # is set, printing is set to None regardless of its command line
@@ -71,13 +73,14 @@ class AL:
         cls.parser.add_argument('-l', '--log', choices=['THREAD_DEBUG',
                     'DEBUG', 'DATA', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                     help='optional file logging and logging level')
+        cls.parser.add_argument('-L', '--log_directory',
+                    help='top-level log directory (full pathname or relative)',
+                    default='/var/local/log')
         cls.args = cls.parser.parse_args()
 
         addLevelName(THREAD_DEBUG, 'THREAD_DEBUG')
         addLevelName(DATA, 'DATA')
-
-        cls.log = getLogger()
-        cls.log.setLevel(THREAD_DEBUG)
+        LOG.setLevel(THREAD_DEBUG)
 
         if hasattr(cls.args, 'daemon') and cls.args.daemon:
             cls.args.print = None
@@ -89,10 +92,9 @@ class AL:
             print_handler.setLevel(cls.args.print)
             print_formatter = Formatter('%(message)s')
             print_handler.setFormatter(print_formatter)
-            cls.log.addHandler(print_handler)
+            LOG.addHandler(print_handler)
 
-        low_name = cls.name.lower()
-        log_name = low_name
+        log_name = cls.name.lower()
         if hasattr(cls.args, 'port_number'):
             port_number = DEFAULT_PORT_NUMBER
             if cls.args.port_number:
@@ -104,16 +106,12 @@ class AL:
                 else:
                     warning = ('invalid port number "%s"; default used'
                                % cls.args.port_number)
-                    cls.log.warning(ct(BYELLOW, warning))
+                    LOG.warning(ct(BYELLOW, warning))
             cls.args.port_number = port_number
             log_name += str(port_number)
 
-        args = str(cls.args).split('(')[1][:-1]
-        cls.log.info(ct(BBLUE, '\nstarting %s with the following arguments/'
-                               'defaults:\n' % cls.name) + ct(BGREEN, args))
-
         if cls.args.log:
-            dir_path = Path('/var/local/log/' + low_name)
+            dir_path = Path(cls.args.log_directory) / Path(cls.name.lower())
             log_path = dir_path / Path(log_name + '.log')
             try:
                 dir_path.mkdir(parents=True, exist_ok=True)
@@ -122,10 +120,22 @@ class AL:
             except OSError as oserr:
                 warning = ('open error %s "%s" %s; log option ignored'
                            % (oserr.errno, log_path, oserr.strerror))
-                cls.log.warning(ct(BYELLOW, warning))
+                LOG.warning(ct(BYELLOW, warning))
+                cls.args.log = None
             else:
                 log_handler.setLevel(cls.args.log)
                 log_formatter = Formatter(
                     '%(asctime)s %(levelname)s %(message)s')
                 log_handler.setFormatter(log_formatter)
-                cls.log.addHandler(log_handler)
+                LOG.addHandler(log_handler)
+
+        args = str(cls.args).split('(')[1][:-1]
+        LOG.info(ct(BBLUE, 'starting %s with the following arguments/'
+                           'defaults:\n%s' % (cls.name, args)))
+
+    @classmethod
+    def stop(cls):
+
+        # Log main program stopping message.
+
+        LOG.info(ct(BBLUE, 'stopping %s' % cls.name))

@@ -31,20 +31,26 @@ __version__ = '1.0.0'
 __date__ = 'December 12, 2019'
 
 
+from logging import getLogger
 from socket import create_connection, gethostname
 
 from argsandlogs import AL
 from colortext import *
+from iomgr import STATUS_INTERVAL
 from messagesocket import MessageSocket, SOCKET_TIMEOUT
 from nbi import NBI
 
 
-SERVER_TIMEOUT = 300.0
+# Globals:
+
+LOG = getLogger('Plugin.pidacs-c')
+
+SERVER_TIMEOUT = STATUS_INTERVAL + 10.0
 
 
-def log_messages(message):
+def log_message(message):
     level = int(message[:2])
-    AL.log.log(level, message[2:])
+    LOG.log(level, message[2:])
 
 
 # pidacs-c main program:
@@ -58,30 +64,30 @@ address_tuple = AL.args.server, AL.args.port_number
 try:
     server_socket = create_connection(address_tuple, SOCKET_TIMEOUT)
 except OSError as oserr:
-    AL.log.info(ct(BRED, 'connection error %s "%s:%s" %s'
-                % (oserr.errno, AL.args.server, AL.args.port_number,
-                   oserr.strerror)))
+    LOG.error(ct(BRED, 'connection error %s "%s:%s" %s'
+                 % (oserr.errno, AL.args.server, AL.args.port_number,
+                    oserr.strerror)))
 else:
-    server = MessageSocket(AL.args.server, server_socket, log_messages,
-                           SERVER_TIMEOUT)
-    AL.log.info(ct(BGREEN, 'connected "%s"' % server.name))
+    server = MessageSocket(AL.args.server, server_socket,
+                           process_message=log_message,
+                           recv_timeout=SERVER_TIMEOUT)
+    LOG.info(ct(BGREEN, 'connected "%s"' % server.name))
     server.send(gethostname())
     server.start()
 
     NBI.start()
-    AL.log.info(ct(BBLUE, '\nstarting %s interactive session'
-                          '\nenter requests: [channel_name request_id '
-                          'argument] or [quit]' % AL.name))
+    LOG.info(ct(BBLUE, 'starting %s interactive session'
+                       '\nenter requests: [channel_name request_id '
+                       'argument] or [quit]' % AL.name))
     try:
         while server.running:
             user_request = NBI.get_input()
-            if user_request is None:
-                continue
-            if user_request and 'quit'.startswith(user_request.lower()):
-                server.running = False
-                continue
-            server.send(user_request)
+            if user_request:
+                if 'quit'.startswith(user_request.lower()):
+                    server.running = False
+                else:
+                    server.send(user_request)
     except KeyboardInterrupt:
         server.running = False
     server.stop()
-AL.log.info(ct(BBLUE, 'ending %s' % AL.name))
+AL.stop()

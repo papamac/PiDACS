@@ -26,31 +26,33 @@ DESCRIPTION
 """
 __author__ = 'papamac'
 __version__ = '1.0.0'
-__date__ = 'December 12, 2019'
+__date__ = 'December 14, 2019'
 
 
 from binascii import crc32
 from datetime import datetime
+from logging import getLogger
 from math import sqrt
 from socket import *
 from threading import Thread, Lock
 
-from argsandlogs import AL
 from colortext import *
 
 
 # Globals:
 
-CRC_LEN = 8                   # CRC length (bytes).
-SEQ_LEN = 8                   # Sequence number length (bytes).
-HEX_LEN = CRC_LEN + SEQ_LEN   # Hex segment length (bytes).
-DT_LEN = 26                   # Datetime length (bytes).
-HDR_LEN = HEX_LEN + DT_LEN    # Total header length (bytes).
-DATA_LEN = 80                 # Data segment length (bytes).
-MSG_LEN = HDR_LEN + DATA_LEN  # Total fixed message length (bytes).
-SOCKET_TIMEOUT = 10.0         # Timeout limit for socket connection, recv, and
-#                               send methods (sec).
-STATUS_INTERVAL = 600         # Status reporting interval (sec).
+LOG = getLogger('Plugin.messagesocket')
+
+CRC_LEN = 8                      # CRC length (bytes).
+SEQ_LEN = 8                      # Sequence number length (bytes).
+HEX_LEN = CRC_LEN + SEQ_LEN      # Hex segment length (bytes).
+DT_LEN = 26                      # Datetime length (bytes).
+HDR_LEN = HEX_LEN + DT_LEN       # Total header length (bytes).
+DATA_LEN = 80                    # Data segment length (bytes).
+MSG_LEN = HDR_LEN + DATA_LEN     # Total fixed message length (bytes).
+SOCKET_TIMEOUT = 10.0            # Timeout limit for socket connection, recv,
+#                                  and send methods (sec).
+DEFAULT_STATUS_INTERVAL = 600.0  # Default status reporting interval (sec).
 
 
 def next_seq(seq):
@@ -61,8 +63,9 @@ class SocketStatus:
 
     # Private methods:
 
-    def __init__(self, msg_sock):
-        self._msg_sock = msg_sock
+    def __init__(self, name, status_interval):
+        self._name = name
+        self._status_interval = status_interval
         self._lock = Lock()
         self._min = None
         self._max = None
@@ -83,7 +86,7 @@ class SocketStatus:
 
         with self._lock:
             interval = (datetime.now() - self._status_dt).total_seconds()
-            if interval >= STATUS_INTERVAL:
+            if interval >= self._status_interval:
                 recv_rate = self._recvd / interval
                 avg = self._sum / self._recvd if self._recvd else 0.0
                 std = (sqrt(self._sum2 / self._recvd - avg * avg)
@@ -103,11 +106,14 @@ class SocketStatus:
                 if self._send_errs + self._send_timeouts:
                     send_status = ct(REVERSE, send_status)
 
-                AL.log.info('status "%s" %s %s'
-                            % (self._msg_sock.name, recv_status, send_status))
+                LOG.debug('status "%s" %s %s'
+                          % (self._name, recv_status, send_status))
                 self._init()  # Initialize status data for the next interval.
 
     # Public methods.
+
+    def update_name(self, name):
+        self._name = name
 
     def recv(self, message, recvd_dt):
 
@@ -164,18 +170,28 @@ class MessageSocket(Thread):
 
     # Private methods.
 
-    def __init__(self, address, sock, process_message, recv_to=0.0):
+    def __init__(self, address, sock,
+                 reference_name=None,
+                 process_message=None, error_callback=None,
+                 recv_timeout=0.0, status_interval=DEFAULT_STATUS_INTERVAL):
         sock.settimeout(SOCKET_TIMEOUT)
         ipv4, port = sock.getpeername()
         name = '%s[%s:%s]' % (address, ipv4, port)
         Thread.__init__(self, name=name)
         self._socket = sock
-        self._process_message = process_message
-        self._recv_timeout = recv_to
+        self._reference_name = reference_name
+        self._process_message = self._pass
+        if process_message:
+            self._process_message = process_message
+        self._error_callback = error_callback if error_callback else self._pass
+        self._recv_timeout = recv_timeout
+        self._status = SocketStatus(name, status_interval)
         self._recvd_dt = datetime.now()
         self._send_seq = 0
-        self._status = SocketStatus(self)
         self.running = True
+
+    def _pass(self, arg):
+        pass
 
     def _shutdown(self):
         try:
@@ -183,11 +199,15 @@ class MessageSocket(Thread):
         except OSError as oserr:
             if oserr.errno not in (9, 57, 107):  # Ignore errors from multiple
                 #                                  shutdown/close calls.
-                AL.log.warning(ct(BYELLOW, 'shutdown error %s "%s" %s'
-                               % (oserr.errno, self.name, oserr.strerror)))
+                LOG.warning(ct(BYELLOW, 'shutdown error %s "%s" %s'
+                            % (oserr.errno, self.name, oserr.strerror)))
         self._socket.close()
 
     # Public methods.
+
+    def update_name(self, name):
+        self.name = name
+        self._status.update_name(name)
 
     def stop(self):
         self.running = False
@@ -249,9 +269,10 @@ class MessageSocket(Thread):
 
             if self.running:
                 self.running = False
-                AL.log.error(ex_msg)
+                LOG.error(ex_msg)
+                self._error_callback(self._reference_name)
             else:
-                AL.log.debug(ct(BBLUE, ex_msg[9:-4]))
+                LOG.debug(ct(BBLUE, ex_msg[9:-4]))
             return  # Return None for hard error.
 
         # Full-length byte_msg received; check for errors, update status data,
@@ -265,11 +286,11 @@ class MessageSocket(Thread):
 
     def send(self, message):
 
-        # Truncate message if it is too long.
+        # Remove blanks and truncate if necessary.
 
         message = message.strip()
         if len(message) > DATA_LEN:
-            AL.log.warning(ct(BYELLOW, 'message truncated "%s"' % message))
+            LOG.warning(ct(BYELLOW, 'message truncated "%s"' % message))
             message = message[:DATA_LEN]
 
         # Add the crc, sequence number, and datetime to create a fixed-length
@@ -306,9 +327,10 @@ class MessageSocket(Thread):
 
             if self.running:
                 self.running = False
-                AL.log.error(ex_msg)
+                LOG.error(ex_msg)
+                self._error_callback(self._reference_name)
             else:
-                AL.log.debug(ct(BBLUE, ex_msg[9:-4]))
+                LOG.debug(ct(BBLUE, ex_msg[9:-4]))
             return
 
         # Full-length message sent or send_err; update status and return.

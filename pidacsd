@@ -20,7 +20,7 @@
 #       USAGE:  source src/pidacs/install or p2pkg -i pidacs (see examples
 #               below).
 #      AUTHOR:  papamac
-#        DATE:  September 22, 2019
+#        DATE:  December 12, 2019
 #
 # DESCRIPTION:
 #
@@ -81,7 +81,7 @@ function start {
         --make-pidfile \
         --pidfile $pidfile \
         --startas $program_file \
-        -- -l -L DATA -I $port_number $port_names 2>&1
+        -- -d -P $port_number $port_names 2>&1
     exit_status=$?
     case $exit_status in
         0) infomsg "   exit status:  $g${t}daemon started ($exit_status)$n" ;;
