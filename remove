@@ -56,7 +56,7 @@
 
 # Set directory variables.
 
-log=/var/local/log                        # log directory.
+log=/var/local/log                  # log directory.
 
 # Remove PiDACS files.
 

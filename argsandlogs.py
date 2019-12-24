@@ -45,7 +45,7 @@ THREAD_DEBUG = 5
 DATA = 15
 
 DYNAMIC_PORT_RANGE = range(49152, 65535)  # Range of valid dynamic ports.
-DEFAULT_PORT_NUMBER = 52000   # Arbitrary selection from DYNAMIC_PORT_RANGE.
+DEFAULT_PORT_NUMBER = 50000   # Arbitrary selection from DYNAMIC_PORT_RANGE.
 
 
 class AL:

@@ -70,10 +70,10 @@ class Server:
 
     @classmethod
     def stop(cls):
-        for client in cls._clients:
-            client.stop()
         cls._accept.join()
         cls._serve.join()
+        for client in cls._clients:
+            client.stop()
 
     @classmethod
     def terminate(cls, *args):
@@ -96,10 +96,15 @@ class Server:
                 continue
             client = MessageSocket('', client_socket,
                                    process_message=IOMGR.process_request)
-            client.update_name(client.recv() + client.name)
-            LOG.info(ct(BGREEN, 'connected "%s"' % client.name))
-            client.start()
-            cls._clients.append(client)
+            client_hostname = client.recv()
+            if client_hostname:
+                client.update_name(client_hostname + client.name)
+                LOG.info(ct(BGREEN, 'connected "%s"' % client.name))
+                client.start()
+                cls._clients.append(client)
+            else:
+                LOG.error(ct(BRED, 'connection aborted "%s"' % client.name))
+                client.stop()
 
     @classmethod
     def _serve_clients(cls):

@@ -58,6 +58,7 @@ from datetime import datetime
 from logging import getLogger, DEBUG, INFO, WARNING, ERROR
 from math import fabs, log2
 from queue import *
+from re import sub
 from threading import Thread
 from time import sleep
 
@@ -193,27 +194,13 @@ REQUESTS = {'alias':       {'*': None},
 class Port(Thread):
     """
     """
+    # Private methods:
+
     def __init__(self, name):
         Thread.__init__(self, name=name)
         self._channels = []  # All Channel objects for this Port instance.
         self._queue = Queue()  # Request queue for this Port instance.
         self._running = False
-
-    # Public methods:
-
-    def start(self):
-        self._running = True
-        Thread.start(self)
-
-    def stop(self):
-        if self._running:
-            self._running = False
-            self.join()
-
-    def queue_request(self, *args):
-        self._queue.put(args)
-
-    # Private methods used only in the Port execution thread:
 
     def run(self):
         poll_count = 0
@@ -235,14 +222,11 @@ class Port(Thread):
                     method(argument)
                     LOG.debug('executed [%s %s %s]'
                               % (channel_name, request_id, argument))
-                except OSError as oserr:
-                    err = ('error %s in calling method "%s" for '
-                           'channel "%s" %s; state unknown'
-                           % (oserr.errno, request_id, channel.id,
-                              oserr.strerror))
-                    IOMGR.queue_message(ERROR, ct(BRED, err))
-                    IOMGR.queue_message(DATA, '%s !ERROR %s %s'
-                                        % (channel.id, request_id, argument))
+                except Exception as err:
+                    err_msg = ('execution error [%s %s %s] %s'
+                               % (channel_name, request_id, argument, err))
+                    IOMGR.queue_message(ERROR, ct(BRED, err_msg))
+                    IOMGR.queue_message(DATA, '%s !ERROR' % channel.id)
 
             # Perform periodic polling and status functions.
 
@@ -282,11 +266,27 @@ class Port(Thread):
     def _value_changed(self, channel):
         return channel.value != channel.prior_value
 
+# Public methods:
+
+    def start(self):
+        self._running = True
+        Thread.start(self)
+
+    def stop(self):
+        if self._running:
+            self._running = False
+            self.join()
+
+    def queue_request(self, *args):
+        self._queue.put(args)
+
 
 class Channel:
     """
     """
     channels = {}
+
+    # Private methods:
 
     def __init__(self, port, name, alt_name=None):
         self.port = port
@@ -304,20 +304,6 @@ class Channel:
         self.channels[name] = self
         if alt_name:
             self.channels[alt_name] = self
-
-    # Public methods called by Port.run
-
-    def alias(self, alias):
-        self.id = '%s[%s]' % (alias, self._name)
-        self.channels[alias] = self
-
-    def change(self, change):
-        self.change_ = change
-
-    def interval(self, interval):
-        self.interval_ = interval
-
-    # Private methods:
 
     @staticmethod
     def _check_bitval(bitval):
@@ -339,6 +325,18 @@ class Channel:
         self.prior_value = self.value
         self.value = value
         IOMGR.queue_message(DATA, self.id, value)
+
+    # Public methods:
+
+    def alias(self, alias):
+        self.id = '%s[%s]' % (alias, self._name)
+        self.channels[alias] = self
+
+    def change(self, change):
+        self.change_ = change
+
+    def interval(self, interval):
+        self.interval_ = interval
 
 
 class BCM283X(Port):
@@ -373,13 +371,13 @@ class BCM283X(Port):
     class _Channel(Channel):
         """
         """
+        # Private methods:
+
         def __init__(self, port, name, alt_name):
             Channel.__init__(self, port, name, alt_name)
-
-            self.polarity = POLARITY
-
             self._number = int(name[2:])
             self._pullup = None
+            self._polarity = POLARITY
             self._dutycycle = DUTYCYCLE
             self._frequency = FREQUENCY
             self._pwm = None
@@ -392,8 +390,15 @@ class BCM283X(Port):
             self.direction(DIRECTION)
             self.read()
 
-        # Public methods called by Port.execute_request(channel, request_id,
-        # argument):
+        def _apply_polarity(self, bitval):
+            if self._polarity:
+                bitval = 0 if bitval else 1
+            return bitval
+
+        def _write_hw(self, bitval):
+            GPIO.output(self._number, bitval)
+
+        # Public methods:
 
         def direction(self, direction):
             pullup = GPIO.PUD_OFF if direction is OUTPUT else self._pullup
@@ -419,6 +424,10 @@ class BCM283X(Port):
                 sleep(delay)
                 self._write_hw(OFF)
                 self._update(OFF)
+
+        def polarity(self, polarity):
+            if self._check_direction(INPUT):
+                self._polarity = polarity
 
         def pullup(self, pullup):
             if self._check_direction(INPUT):
@@ -463,16 +472,6 @@ class BCM283X(Port):
                         self.interval_ = self._save_interval
                     self._write_hw(bitval)
                     self._update(bitval)
-
-        # Private methods:
-
-        def _apply_polarity(self, bitval):
-            if self.polarity:
-                bitval = 0 if bitval else 1
-            return bitval
-
-        def _write_hw(self, bitval):
-            GPIO.output(self._number, bitval)
 
 
 class MCP230XX(Port):
@@ -540,7 +539,7 @@ class MCP230XX(Port):
                 bitval = 1 if self._gpio.value & mask else 0
             else:  # gpio register read error.
                 bitval = '!ERROR'
-                IOMGR.queue_message(DATA, '%s !ERROR read' % channel.id)
+                IOMGR.queue_message(DATA, '%s !ERROR' % channel.id)
             channel.prior_value = channel.value
             channel.value = bitval
             if channel.change_ and changes & mask:
@@ -600,6 +599,8 @@ class MCP230XX(Port):
         MCP230XX._Channel methods accomplish their functions using
         MCP230XX._Register methods to read/write lower-level registers.
         """
+        # Private methods:
+
         def __init__(self, port, name):
             Channel.__init__(self, port, name)
 
@@ -617,8 +618,10 @@ class MCP230XX(Port):
             self.pullup(PULLUP)
             self.read()
 
-        # Public methods called by Port.execute_request(channel, request_id,
-        # argument):
+        def _write_hw(self, bitval):
+            self._gpio.update(self.number, bitval)
+
+        # Public methods:
 
         def direction(self, direction):
             self._iodir.update(self.number, direction)
@@ -655,11 +658,6 @@ class MCP230XX(Port):
                     self._write_hw(bitval)
                     self._update(bitval)
 
-        # Private method:
-
-        def _write_hw(self, bitval):
-            self._gpio.update(self.number, bitval)
-
 
 class MCP342X(Port):
 
@@ -689,15 +687,15 @@ class MCP342X(Port):
         """
         _I2C_BASE_ADDRESS = 0x68
 
+        # Private methods:
+
         def __init__(self, port, name):
             Channel.__init__(self, port, name)
-
-            self.scaling = SCALING
-
             self._i2c_address = self._I2C_BASE_ADDRESS + int(name[2])
             self._number = int(name[3])
-            self._resolution = RESOLUTION
             self._gain = GAIN
+            self._resolution = RESOLUTION
+            self._scaling = SCALING
             self._config = None
             self._num_bytes = None
 
@@ -706,8 +704,14 @@ class MCP342X(Port):
             self._configure()
             self.read()
 
-        # Public methods called by Port.execute_request(channel, request_id,
-        # argument):
+        def _configure(self):
+            resolution_index = int((self._resolution - 12) / 2)
+            gain_index = int(log2(self._gain))
+            self._config = (0x80 + 32 * self._number + 4 * resolution_index
+                            + gain_index)
+            self._num_bytes = 3 if self._resolution < 18 else 4
+
+        # Public methods:
 
         def gain(self, gain):
             self._gain = gain
@@ -717,8 +721,8 @@ class MCP342X(Port):
             self._resolution = resolution
             self._configure()
 
-        # Semi-private method called only by read() and the port method
-        # _poll().
+        def scaling(self, scaling):
+            self._scaling = scaling
 
         def read(self, *args):
             value = self.read_hw()
@@ -737,16 +741,7 @@ class MCP342X(Port):
             if counts < 0:
                 counts = 0
             lsb_value = 4.096 / 2 ** self._resolution
-            return counts * lsb_value / self._gain * self.scaling
-
-        # Private method:
-
-        def _configure(self):
-            resolution_index = int((self._resolution - 12) / 2)
-            gain_index = int(log2(self._gain))
-            self._config = (0x80 + 32 * self._number + 4 * resolution_index
-                            + gain_index)
-            self._num_bytes = 3 if self._resolution < 18 else 4
+            return counts * lsb_value / self._gain * self._scaling
 
 
 class MCP320X:
@@ -760,12 +755,14 @@ class MCP482X:
 class IOMGR:
     """
     """
-    _ports = []
+    # Class attributes:
+
     _PORTS = {'aa': (4, MCP342X),  'ab': (8, MCP342X),
               'ad': (8, MCP320X),  'ae': (8, MCP320X),
               'da': (8, MCP482X),  'db': (8, MCP482X),
               'ga': (8, MCP230XX), 'gb': (8, MCP230XX),
               'gg': (2, BCM283X),  'gp': (2, BCM283X)}
+    _ports = []
     _queue = Queue()
     _gpio_cleanup = False
     running = False
@@ -782,29 +779,29 @@ class IOMGR:
                 port_type = port_name[:2]
                 num = int(port_name[2])
                 if port_type in cls._PORTS and num < cls._PORTS[port_type][0]:
-                    if port_type == 'gg':
-                        alt_port_name = 'gp' + str(num)
-                    elif port_type == 'gp':
-                        alt_port_name = 'gg' + str(num)
-                    else:
-                        alt_port_name = None
-                    for port in cls._ports:
-                        if port.name in (port_name, alt_port_name):
-                            break
-                    else:
-                        info = 'starting port "%s"' % port_name
-                        cls.queue_message(INFO, ct(BGREEN, info))
-                        try:
-                            port = cls._PORTS[port_type][1](port_name)
-                        except OSError as oserr:
-                            err = ('error %s on port "%s" %s; startup aborted'
-                                   % (oserr.errno, port_name, oserr.strerror))
-                            cls.queue_message(ERROR, ct(BRED, err))
-                        cls._ports.append(port)
-                        port.start()
-                        if port_type in ('gg', 'gp'):
-                            cls._gpio_cleanup = True
+                    alt_port_name = 'gp' + str(num)
+                elif port_type == 'gp':
+                    alt_port_name = 'gg' + str(num)
+                else:
+                    alt_port_name = None
+                for port in cls._ports:
+                    if port.name in (port_name, alt_port_name):
+                        break
+                else:
+                    info = 'starting port "%s"' % port_name
+                    cls.queue_message(INFO, ct(BGREEN, info))
+                    try:
+                        port = cls._PORTS[port_type][1](port_name)
+                    except OSError as oserr:
+                        err = ('error %s on port "%s" %s; startup aborted'
+                               % (oserr.errno, port_name, oserr.strerror))
+                        cls.queue_message(ERROR, ct(BRED, err))
                         continue
+                    cls._ports.append(port)
+                    port.start()
+                    if port_type in ('gg', 'gp'):
+                        cls._gpio_cleanup = True
+                    continue
             err = ('invalid or duplicate port name "%s"; port not started'
                    % port_name)
             cls.queue_message(ERROR, ct(BRED, err))
@@ -831,11 +828,9 @@ class IOMGR:
 
     @classmethod
     def queue_message(cls, level, *args):
-        message = ''
-        for arg in args:
-            message += '%s ' % arg
-        cls._queue.put('%02i%s' % (level, message[:-1]))
+        message = ' '.join((str(arg) for arg in args))
         LOG.log(level, message)
+        cls._queue.put('%s %s' % (level, sub('\033\[.*?m', '', message)))
 
     @classmethod
     def process_request(cls, request):

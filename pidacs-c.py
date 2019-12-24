@@ -36,7 +36,6 @@ from socket import create_connection, gethostname
 
 from argsandlogs import AL
 from colortext import *
-from iomgr import STATUS_INTERVAL
 from messagesocket import MessageSocket, SOCKET_TIMEOUT
 from nbi import NBI
 
@@ -45,12 +44,17 @@ from nbi import NBI
 
 LOG = getLogger('Plugin.pidacs-c')
 
-SERVER_TIMEOUT = STATUS_INTERVAL + 10.0
+STATUS_INTERVAL = 600.0                     # iomgr status reporting interval.
+SERVER_TIMEOUT = STATUS_INTERVAL + 10.0     # Timeout must be longer than the
+#                                             status reporting interval to
+#                                             avoid timeouts from an idle
+#                                             server.
 
 
 def log_message(message):
-    level = int(message[:2])
-    LOG.log(level, message[2:])
+    message_split = message.split(maxsplit=1)
+    level = int(message_split[0])
+    LOG.log(level, message_split[1])
 
 
 # pidacs-c main program:

@@ -61,7 +61,7 @@ function status {
 }
 
 function start {
-    program_file=/usr/local/bin/pidacs  # Executable program file (full path).
+    program_file=/usr/local/bin/pidacs-s  # Executable program file (full path).
                                         #   usr/local segment may be edited
                                         #   by the option script.
     port_number=${daemon_name##*[a-z]}  # IP port number from daemon name.
