@@ -1,20 +1,49 @@
 ###############################################################################
 #
-#     PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
-#        FILE:  option
-#       TITLE:  Optionally install and start the PiDACS server daemon
-#    FUNCTION:  Install the PiDACS server daemon in /etc/init.d, link it for
-#               automatic startup on reboot, and start it in the current boot
-#               session.
-#       USAGE:  option_arg='port_names'; source src/pidacs/option or
-#               p2pkg -I 'port_names' PiDACS (see examples below).
-#      AUTHOR:  papamac
-#        DATE:  September 20, 2019
+#  PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
+#     FILE:  option
+#    TITLE:  Optionally install and start the PiDACS server daemon
+# FUNCTION:  Install the PiDACS server daemon in /etc/init.d, link it for
+#            automatic startup on reboot, and start it in the current boot
+#            session.
+#    USAGE:  option_arg='port_names'; source src/pidacs/option or
+#            p2pkg -I 'port_names' PiDACS (see examples below).
+#   AUTHOR:  papamac
+#  VERSION:  1.0.0
+#     DATE:  January 2, 2020
+#
+#
+# MIT LICENSE:
+#
+# Copyright (c) 2019-2020 David A. Krause, aka papamac
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# allcopies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
 #
 # DESCRIPTION:
 #
 # The option script installs the PiDACS daemon script that has already been
-# downloaded to the src sub-directory of the current working directory.
+# downloaded to the src sub-directory of the current working directory
+# (src/pidacs).
+
+
+
 # Specifically, it marks the PiDACS executable files (iomgr.py, pidacs-c.py,
 # and pidacs-s.py) as executable and it creates symbolic links to these
 # executables in the bin sub-directory of the current working directory.
@@ -40,28 +69,36 @@
 # $HOME is /root.  papamac's runtime environment (see bash_aliases) prevents
 # this from hapening by aliasing sudo to sudo -E.
 #
+# ????????????????????????????????
+# If the port_names argument is specified, pidacsd is also installed, linked
+# for automatic startup on reboot, and started in the current boot session.
+# port_names must be a string of three-character I/O port names separated by
+# spaces, e.g., 'ab0 ab1 ga0 gb0'.  This string is edited into the pidacsd
+# script as the argument to the pidacs executable.
+#
 ###############################################################################
 
-# If the port_names argument is specified, install and start the pidacsd script
-# using the specified port_names.
+# Get the IP port number from the option_arg variable and the I/O port names
+# from the args variable.  Substitute defaults if the arguments are omitted or
+# contain incorrect values.  Append the port number to the daemon script name
+# to uniquely identify the daemon.
 
 declare -i port_number=${option_arg:-50000}
 if [[ $(((port_number < 49152) || (port_number > 65535))) = 1 ]]; then
-    errmsg "invalid IP port number ($option_arg)"
+    errmsg "option: invalid IP port number ($option_arg)"
     exit 10
 fi
 
 daemon_name=pidacsd$port_number
 daemon_file=/etc/init.d/$daemon_name
-port_names=${argument:-'gg0 gg1'}
+port_names=${args:-'gg0 gg1'}
 
-# Edit the daemon script to specify the correct defaults for the port_names
-# and the usr directory.  These defaults must be hard coded in the script
-# for use at startup because init.d executes pidacsd without any arguments.
-# Install the edited script in /etc/init.d, make it executable, and link it
-# for automatic startup on reboot.
+# Edit the daemon script to override the hard coded defaults for the port names
+# and the usr directory.  These values are hard coded in the script because
+# init.d executes pidacsd without any arguments.  Install the edited script in
+# /etc/init.d, make it executable, and link it for automatic startup on reboot.
 
-infomsg "option: installing daemon $y$t$daemon_name$n with port names $y$t'$port_names'$n"
+infomsg "$g${t}option:$n installing daemon $y$t$daemon_name$n with port names $y$t$port_names$n"
 cp $pkg/pidacsd $daemon_file
 cmds="s|gg0 gg1|$port_names|;s|/usr/local|$PWD|;"
 sed -i "$cmds" $daemon_file
@@ -72,4 +109,3 @@ sudo update-rc.d $daemon_name defaults
 
 $daemon_file restart
 exit_status=$?
-

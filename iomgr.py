@@ -1,9 +1,23 @@
 #!/usr/bin/python3
-
 """
-MIT LICENSE
+ PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
+  MODULE:  iomgr.py
+   TITLE:  PiDACS input/output manager (iomgr)
+FUNCTION:  iomgr provides classes and methods to perform input and output
+           operations for a variety of data acquisition and control devices on
+           a Raspberry Pi.
+   USAGE:  iomgr is imported and used within main programs (e.g., pidacs-s).
+           The module also includes an interactive main program that can be
+           executed from the command line for testing purposes.  It is
+           compatible with Python 2.7.16 and all versions of Python 3.x.
+  AUTHOR:  papamac
+ VERSION:  1.0.3
+    DATE:  January 5, 2020
 
-Copyright (c) 2018-2019 David A. Krause, aka papamac
+
+MIT LICENSE:
+
+Copyright (c) 2018-2020 David A. Krause, aka papamac
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -23,59 +37,77 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-DESCRIPTION
 
-IOMGR version 0.9.0 is an initial operational version that supports analog
+DESCRIPTION:
+
+****************************** needs work *************************************
+
+iomgr version 1.0.0 is an initial operational version that supports analog
 input and digital input/output.  Documentation is incomplete.
 
-Device characteristics for current and soon to be supported I/O devices:
+Device characteristics for current and soon to be supported I/O devices are as
+follows:
 
-  Device              Descriotion              Max No     Port    Channels
-   Name                                        Devices    Types   per Port
-
-BCM2835,6,7  Raspberry Pi Baseline GPIO           1     gg0, gp0     7
-             GPIOs 17-18, 22-25, 27
-BCM2835,6,7  Raspberry Pi Extended GPIO           1     gg1, gp1     9
-             GPIOs 5-6, 12-13, 16, 19-21, 26
- MCP23008    8-Bit I/O Expander                   8        ga        8
- MCP23017    16-Bit I/O Expander (A Port)         8        ga        8
- MCP23017    16-Bit I/O Expander (B Port)         8        gb        8
- MCP3204*    4-Channel 12-Bit A/D Converter       8?       ad        4
- MCP3208*    8-Channel 12-Bit A/D Converter       8?       ae        8
- MCP3422,3   2-Channel 18-Bit A/D Converter       4        aa        2
- MCP3424     4-Channel 18-Bit A/D Converter       4        ab        4
- MCP4821*    1-Channel 12-Bit D/A Converter       8?       da        1
- MCP4822*    2-Channel 12-Bit D/A Converter       8?       db        2
+-------------------------------------------------------------------------------
+|  Device   |         Description             | Max No  |   Port   | Channels |
+|   Name    |                                 | Devices |  Types   | per Port |
+|-----------|---------------------------------|---------|----------|----------|
+|BCM2835,6,7| Raspberry Pi Baseline GPIO      |    1    | gg0, gp0 |    7     |
+|           | GPIOs 17-18, 22-25, 27          |         |          |          |
+|-----------|---------------------------------|---------|----------|----------|
+|BCM2835,6,7| Raspberry Pi Extended GPIO      |    1    | gg1, gp1 |    9     |
+|           | GPIOs 5-6, 12-13, 16, 19-21, 26 |         |          |          |
+|-----------|---------------------------------|---------|----------|----------|
+| MCP23008  | 8-Bit I/O Expander              |    8    |    ga    |    8     |
+|-----------|---------------------------------|---------|----------|----------|
+| MCP23017  | 16-Bit I/O Expander (A Port)    |    8    |    ga    |    8     |
+|-----------|---------------------------------|---------|----------|----------|
+| MCP23017  | 16-Bit I/O Expander (B Port)    |    8    |    gb    |    8     |
+|-----------|---------------------------------|---------|----------|----------|
+| MCP3204*  | 4-Channel 12-Bit A/D Converter  |    8?   |    ad    |    4     |
+|-----------|---------------------------------|---------|----------|----------|
+| MCP3208*  | 8-Channel 12-Bit A/D Converter  |    8?   |    ae    |    8     |
+|-----------|---------------------------------|---------|----------|----------|
+| MCP3422,3 | 2-Channel 18-Bit A/D Converter  |    4    |    aa    |    2     |
+|-----------|---------------------------------|---------|----------|----------|
+| MCP3424   | 4-Channel 18-Bit A/D Converter  |    4    |    ab    |    4     |
+|-----------|---------------------------------|---------|----------|----------|
+| MCP4821*  | 1-Channel 12-Bit D/A Converter  |    8?   |    da    |    1     |
+|-----------|---------------------------------|---------|----------|----------|
+| MCP4822*  | 2-Channel 12-Bit D/A Converter  |    8?   |    db    |    2     |
+-------------------------------------------------------------------------------
 
  * Implementation in progress.
 
+
+DEPENDENCIES/LIMITATIONS:
+
+****************************** needs work *************************************
+
 """
 __author__ = 'papamac'
-__version__ = '1.0.0'
-__date__ = 'December 12, 2019'
+__version__ = '1.0.3'
+__date__ = 'January 5, 2020'
+
 
 from datetime import datetime
-from logging import getLogger, DEBUG, INFO, WARNING, ERROR
+from logging import DEBUG, INFO, WARNING, ERROR
 from math import fabs, log2
-from queue import *
-from re import sub
+from queue import Queue, Empty
 from threading import Thread
 from time import sleep
 
-from argsandlogs import AL, DATA
-from colortext import *
 from i2cbus import I2CBUS
-from nbi import NBI
 import RPi.GPIO as GPIO
 
+from papamaclib.argsandlogs import AL
+from papamaclib.colortext import getLogger, DATA
+from papamaclib.messagesocket import STATUS_INTERVAL
+from papamaclib.nbi import NBI
 
-# Globals:
+# Global constant:
 
-LOG = getLogger('Plugin.iomgr')
-
-# Module iomgr global constants:
-
-STATUS_INTERVAL = 600       # Interval for port status reporting (sec).
+LOG = getLogger('Plugin')   # Color logger.
 
 # Channel configuration constants are used to specify the operational
 # characteristics of specific analog and digital channels.  The optional values
@@ -165,30 +197,41 @@ INTERVAL = NONE             # Interval reporting DEFAULT is NONE.
 
 #           request_id      DEFAULT and optional argument values
 
-REQUESTS = {'alias':       {'*': None},
-            'change':      {'DEFAULT': CHANGE, 'none': NONE, 'yes': YES,
-                            'false': FALSE, 'true': TRUE, '#': None},
-            'direction':   {'DEFAULT': DIRECTION, 'input': INPUT,
-                            'output': OUTPUT, '1': 1, '0': 0},
-            'dutycycle':   {'DEFAULT': DUTYCYCLE, '<=': 100},
-            'frequency':   {'DEFAULT': FREQUENCY, '<=': 1000},
-            'gain':        {'DEFAULT': GAIN, '1': 1, '2': 2, '4': 4, '8': 8},
-            'interval':    {'DEFAULT': INTERVAL, 'none': NONE, 'yes': YES,
-                            'false': FALSE, 'true': TRUE, '<=': 86400},
-            'momentary':   {'DEFAULT': MOMENTARY, '<=': 5},
-            'polarity':    {'DEFAULT': POLARITY, 'normal': NORMAL,
-                            'inverted': INVERTED, '0': 0, '1': 1},
-            'pullup':      {'DEFAULT': PULLUP, 'disabled': DISABLED,
-                            'enabled': ENABLED, 'off': OFF, 'on': ON,
-                            'down': DOWN, 'up': UP, '0': 0, '1': 1, '2': 2},
-            'pwm':         {'DEFAULT': OPERATION, 'start': START,
-                            'stop': STOP, '1': 1, '0': 0},
-            'read':        {'DEFAULT': None},
-            'resolution':  {'DEFAULT': RESOLUTION, '12': 12, '14': 14,
-                            '16': 16, '18': 18},
-            'scaling':     {'DEFAULT': SCALING, '#': None},
-            'write':       {'DEFAULT': WRITE, 'off': OFF, 'on': ON,
-                            'false': FALSE, 'true': TRUE, '<=': 5}}
+REQUESTS = {'alias':       {'*':        None},
+            'change':      {'DEFAULT':  CHANGE,      'none':     NONE,
+                            'yes':      YES,         'false':    FALSE,
+                            'true':     TRUE,        '#':        None},
+            'direction':   {'DEFAULT':  DIRECTION,   'input':    INPUT,
+                            'output':   OUTPUT,      '1':        1,
+                            '0':        0},
+            'dutycycle':   {'DEFAULT':  DUTYCYCLE,   '<=':       100},
+            'frequency':   {'DEFAULT':  FREQUENCY,   '<=':       1000},
+            'gain':        {'DEFAULT':  GAIN,        '1':        1,
+                            '2':        2,           '4':        4,
+                            '8':        8},
+            'interval':    {'DEFAULT':  INTERVAL,    'none':     NONE,
+                            'yes':      YES,         'false':    FALSE,
+                            'true':     TRUE,        '<=':       86400},
+            'momentary':   {'DEFAULT':  MOMENTARY,   '<=':       5},
+            'polarity':    {'DEFAULT':  POLARITY,    'normal':   NORMAL,
+                            'inverted': INVERTED,    '0':        0,
+                            '1': 1},
+            'pullup':      {'DEFAULT':  PULLUP,      'disabled': DISABLED,
+                            'enabled':  ENABLED,     'off':      OFF,
+                            'on':       ON,          'down':     DOWN,
+                            'up':       UP,          '0':        0,
+                            '1':        1,           '2':        2},
+            'pwm':         {'DEFAULT':  OPERATION,   'start':    START,
+                            'stop':     STOP,        '1':        1,
+                            '0':        0},
+            'read':        {'DEFAULT':  None},
+            'resolution':  {'DEFAULT':  RESOLUTION,  '12':       12,
+                            '14':       14,          '16':       16,
+                            '18':       18},
+            'scaling':     {'DEFAULT':  SCALING,     '#':        None},
+            'write':       {'DEFAULT':  WRITE,       'off':      OFF,
+                            'on':       ON,          'false':    FALSE,
+                            'true':     TRUE,        '<=':       5}}
 
 
 class Port(Thread):
@@ -198,11 +241,40 @@ class Port(Thread):
 
     def __init__(self, name):
         Thread.__init__(self, name=name)
-        self._channels = []  # All Channel objects for this Port instance.
+        self._channels = []    # All Channel objects for this Port instance.
         self._queue = Queue()  # Request queue for this Port instance.
         self._running = False
 
+    def _poll(self, dt_now):
+        for channel in self._channels:
+            if channel.change_ or channel.interval_:
+                try:
+                    value = channel.read_hw()
+                except OSError as err:
+                    self._running = False
+                    err_msg = ('polling read error %s on channel "%s" %s; '
+                               'port "%s" stopped'
+                               % (err.errno, channel.id,
+                                  err.strerror, self.name))
+                    IOMGR.queue_message(ERROR, err_msg)
+                    IOMGR.queue_message(DATA, '%s !ERROR' % channel.id)
+                    value = '!ERROR'
+                channel.prior_value = channel.value
+                channel.value = value
+                if channel.change_ and self._value_changed(channel):
+                    IOMGR.queue_message(DATA, channel.id, channel.value)
+                interval = (dt_now - channel.prior_report).total_seconds()
+                if channel.interval_ and interval >= channel.interval_:
+                    IOMGR.queue_message(DATA, channel.id, channel.value)
+                    channel.prior_report = dt_now
+
+    def _value_changed(self, channel):
+        return channel.value != channel.prior_value
+
+# Public methods:
+
     def run(self):
+        self._running = True
         poll_count = 0
         dt_status = datetime.now()
 
@@ -225,7 +297,7 @@ class Port(Thread):
                 except Exception as err:
                     err_msg = ('execution error [%s %s %s] %s'
                                % (channel_name, request_id, argument, err))
-                    IOMGR.queue_message(ERROR, ct(BRED, err_msg))
+                    IOMGR.queue_message(ERROR, err_msg)
                     IOMGR.queue_message(DATA, '%s !ERROR' % channel.id)
 
             # Perform periodic polling and status functions.
@@ -240,37 +312,6 @@ class Port(Thread):
                                            % (self.name, rate))
                 poll_count = 0
                 dt_status = dt_now
-
-    def _poll(self, dt_now):
-        for channel in self._channels:
-            if channel.change_ or channel.interval_:
-                try:
-                    value = channel.read_hw()
-                except OSError as oserr:
-                    self._running = False
-                    err = ('polling read error %s on channel "%s" %s; '
-                           'port "%s" stopped' % (oserr.errno, channel.id,
-                                                  oserr.strerror, self.name))
-                    IOMGR.queue_message(ERROR, ct(BRED, err))
-                    IOMGR.queue_message(DATA, '%s !ERROR read' % channel.id)
-                    value = '!ERROR'
-                channel.prior_value = channel.value
-                channel.value = value
-                if channel.change_ and self._value_changed(channel):
-                    IOMGR.queue_message(DATA, channel.id, channel.value)
-                interval = (dt_now - channel.prior_report).total_seconds()
-                if channel.interval_ and interval >= channel.interval_:
-                    IOMGR.queue_message(DATA, channel.id, channel.value)
-                    channel.prior_report = dt_now
-
-    def _value_changed(self, channel):
-        return channel.value != channel.prior_value
-
-# Public methods:
-
-    def start(self):
-        self._running = True
-        Thread.start(self)
 
     def stop(self):
         if self._running:
@@ -310,7 +351,7 @@ class Channel:
         ok = bitval in (0, 1)
         if not ok:
             warning = 'invalid bit value "%s"; request ignored' % bitval
-            IOMGR.queue_message(WARNING, ct(BYELLOW, warning))
+            IOMGR.queue_message(WARNING, warning)
         return ok
 
     def _check_direction(self, direction):
@@ -318,7 +359,7 @@ class Channel:
         if not ok:
             warning = ('channel "%s" not configured for %s; request ignored'
                        % (self.id, ('output', 'input')[direction]))
-            IOMGR.queue_message(WARNING, ct(BYELLOW, warning))
+            IOMGR.queue_message(WARNING, warning)
         return ok
 
     def _update(self, value):
@@ -526,12 +567,12 @@ class MCP230XX(Port):
         try:
             self._gpio.read()
             changes = self._gpio.value ^ self._gpio.prior_value
-        except OSError as oserr:
+        except OSError as err:
             self._running = False
             good_gpio_read = False
-            err = ('polling read error %s on port "%s" %s; port stopped'
-                   % (oserr.errno, self.name, oserr.strerror))
-            IOMGR.queue_message(ERROR, ct(BRED, err))
+            err_msg = ('polling read error %s on port "%s" %s; port stopped'
+                       % (err.errno, self.name, err.strerror))
+            IOMGR.queue_message(ERROR, err_msg)
             changes = 0xff
         for channel in self._channels:
             mask = 1 << channel.number
@@ -732,12 +773,11 @@ class MCP342X(Port):
             I2CBUS.write_byte(self._i2c_address, self._config)
             config = self._config & 0x7F
             while True:
-                byts = I2CBUS.read_i2c_block_data(self._i2c_address, config,
-                                                  self._num_bytes)
-                if byts[-1] < 128:
+                bytes_ = I2CBUS.read_i2c_block_data(self._i2c_address, config,
+                                                    self._num_bytes)
+                if bytes_[-1] < 128:
                     break
-            counts = int.from_bytes(byts[:-1], byteorder='big',
-                                    signed=True)
+            counts = int.from_bytes(bytes_[:-1], byteorder='big', signed=True)
             if counts < 0:
                 counts = 0
             lsb_value = 4.096 / 2 ** self._resolution
@@ -789,27 +829,27 @@ class IOMGR:
                         break
                 else:
                     info = 'starting port "%s"' % port_name
-                    cls.queue_message(INFO, ct(BGREEN, info))
+                    cls.queue_message(INFO, info)
                     try:
                         port = cls._PORTS[port_type][1](port_name)
-                    except OSError as oserr:
-                        err = ('error %s on port "%s" %s; startup aborted'
-                               % (oserr.errno, port_name, oserr.strerror))
-                        cls.queue_message(ERROR, ct(BRED, err))
+                    except OSError as err:
+                        err_msg = ('error %s on port "%s" %s; startup aborted'
+                                   % (err.errno, port_name, err.strerror))
+                        cls.queue_message(ERROR, err_msg)
                         continue
                     cls._ports.append(port)
                     port.start()
                     if port_type in ('gg', 'gp'):
                         cls._gpio_cleanup = True
                     continue
-            err = ('invalid or duplicate port name "%s"; port not started'
-                   % port_name)
-            cls.queue_message(ERROR, ct(BRED, err))
+            err_msg = ('invalid or duplicate port name "%s"; port not started'
+                       % port_name)
+            cls.queue_message(ERROR, err_msg)
         if cls._ports:
             cls.running = True
         else:
-            err = 'no port(s) started; %s terminated' % AL.name
-            cls.queue_message(ERROR, ct(BRED, err))
+            err_msg = 'no port(s) started; %s terminated' % AL.name
+            cls.queue_message(ERROR, err_msg)
 
     @classmethod
     def stop(cls):
@@ -830,11 +870,11 @@ class IOMGR:
     def queue_message(cls, level, *args):
         message = ' '.join((str(arg) for arg in args))
         LOG.log(level, message)
-        cls._queue.put('%s %s' % (level, sub('\033\[.*?m', '', message)))
+        cls._queue.put('%s %s' % (level, message))
 
     @classmethod
-    def process_request(cls, request):
-        LOG.debug('received [%s]' % request)
+    def process_request(cls, source, request):
+        LOG.debug('received "%s" [%s]' % (source, request))
 
         # An IOMGR request 2 or 3 fields with the following form:
 
@@ -856,7 +896,7 @@ class IOMGR:
 
         if nsplit not in (2, 3):
             warning = 'invalid syntax; request ignored'
-            cls.queue_message(WARNING, ct(BYELLOW, warning))
+            cls.queue_message(WARNING, warning)
             return
 
         # Check for a valid hardware channel_name or alias.  Declare an error
@@ -866,7 +906,7 @@ class IOMGR:
         channel = Channel.channels.get(channel_name)
         if channel is None:
             warning = 'channel "%s" not found; request ignored' % channel_name
-            cls.queue_message(WARNING, ct(BYELLOW, warning))
+            cls.queue_message(WARNING, warning)
             return
 
         # Attempt to match the second field with the leading characters of the
@@ -888,7 +928,7 @@ class IOMGR:
                     break
         else:
             warning = 'invalid request id "%s"; request ignored' % request_id
-            cls.queue_message(WARNING, ct(BYELLOW, warning))
+            cls.queue_message(WARNING, warning)
             return
 
         # Attempt to match the third field if present, or the string 'DEFAULT'
@@ -918,7 +958,7 @@ class IOMGR:
                     break
         else:
             warning = 'invalid argument "%s"; request ignored' % argument
-            cls.queue_message(WARNING, ct(BYELLOW, warning))
+            cls.queue_message(WARNING, warning)
             return
 
         # Valid request; all checks are complete and the variables
@@ -960,9 +1000,8 @@ if __name__ == '__main__':
     IOMGR.start()
     if IOMGR.running:
         NBI.start()
-        LOG.info(ct(BBLUE, 'starting %s interactive session'
-                           '\nenter requests: [channel_name request_id '
-                           'argument] or [quit]' % AL.name))
+        LOG.blue('starting %s interactive session\nenter requests: '
+                 '[channel_name request_id argument] or [quit]' % AL.name)
         try:
             while IOMGR.running:
                 user_request = NBI.get_input()
@@ -970,7 +1009,7 @@ if __name__ == '__main__':
                     if 'quit'.startswith(user_request.lower()):
                         IOMGR.running = False
                     else:
-                        IOMGR.process_request(user_request)
+                        IOMGR.process_request(AL.name, user_request)
         except KeyboardInterrupt:
             pass
         IOMGR.stop()

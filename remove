@@ -1,29 +1,55 @@
 ###############################################################################
 #
-#     PACKAGE:  papamac's bash scripts and runtime environment (scripts)
-#        FILE:  remove
-#       TITLE:  Remove the scripts package
-#    FUNCTION:  Restore system files to their state before any installations
-#               by the install or option scripts.
-#       USAGE:  source src/scripts/remove or p2pkg -r scripts (see examples
-#               below).
-#      AUTHOR:  papamac
-#        DATE:  December 12, 2019
+#  PACKAGE:  papamac's bash scripts and runtime environment (scripts)
+#     FILE:  remove
+#    TITLE:  Remove the scripts package
+# FUNCTION:  Restore system files to their state before any installationss by
+#            the install or option scripts.
+#    USAGE:  source src/scripts/remove or p2pkg -r scripts (see examples
+#            below).
+#   AUTHOR:  papamac
+#  VERSION:  1.0.0
+#     DATE:  January 2, 2020
+#
+#
+# MIT LICENSE:
+#
+# Copyright (c) 2019-2020 David A. Krause, aka papamac
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# allcopies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
 #
 # DESCRIPTION:
 #
-# The remove script removes all scripts files from the HOME and current working
-# directories.  It also restores the original afp.conf file (if any) in
-# /etc/netatalk.
+# The remove script removes all PiDACS files from the current working
+# directories.  It also stops all PiDACS daemons and removes the daemon files/
+# links.
 #
 # remove is designed to be used with p2pkg.  Usage examples are as follows:
 #
-# sudo -E p2pkg -r scripts              # Remove the scripts package from the
+# sudo -E p2pkg -r PiDACS               # Remove the PiDACS package from the
 #                                         HOME and current working directories
 #                                         and restore /etc/netatalk/afp.conf.
 # cd /usr/local                         # Remove the scripts package from the
 # sudo -E p2pkg -ru /usr/local scripts    HOME and /usr/local directories and
 #                                         restore /etc/netatalk/afp.conf.
+#
 #
 # DEPENDENCIES/LIMITATIONS:
 #
@@ -34,33 +60,12 @@
 # aliasing sudo to sudo -E.
 #
 ###############################################################################
-# Raspberry Pi Data Acquisition and Control System (PiDACS)
-
-# Remove all PiDACS components and stop the PiDACS server daemon, if running.
-
-# The install script is normally executed from <usr>/src.  Usage examples are
-# as follows:
-
-# <usr>/src/remove                  # Remove PiDACS files and directories from
-#                                     HOME.
-# export USR_DIR=/usr/local         # Remove PiDACS files and directories from
-# <usr>/src/remove                    /usr/local.
-
-# remove is also designed to be used with papamac's personal package usility
-# (p2pkg).  Usage examples are as follows:
-
-# p2pkg -r PiDACS                   # Remove PiDACS files and directories from
-#                                     HOME.
-# sudo p2pkg -ru /usr/local PiDACS  # Remove PiDACS files and directories from
-#                                     /usr/local.
-
-# Set directory variables.
 
 log=/var/local/log                  # log directory.
 
-# Remove PiDACS files.
+# Remove the PiDACS files.
 
-infomsg "remove: removing PiDACS files and directories from $y$t$PWD$n"
+infomsg "$g${t}remove:$n removing PiDACS files and directories from $b$t$PWD$n"
 rm -f $bin/iomgr $bin/pidacs-c $bin/pidacs-s $bin/pidacsd
 rm -fr $pkg
 rm -fr $log/iomgr
@@ -69,7 +74,7 @@ rm -fr $log/pidacs-s
 
 # Stop all PiDACS daemons and remove the daemon scripts/links.
 
-infomsg "remove: stopping daemons and removing files in $y$t/etc/init.d$n"
+infomsg "$g${t}remove:$n stopping daemons and removing files in $b$t/etc/init.d$n"
 for daemon_file in /etc/init.d/pidacsd*; do
     if [[ -f $daemon_file ]]; then
         $daemon_file stop

@@ -1,9 +1,23 @@
 #!/usr/bin/python3
-
 """
-MIT LICENSE
+ PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
+  MODULE:  pidacs-c.py
+   TITLE:  PiDACS interactive client main program
+FUNCTION:  pidacs-c is a remote, interactive client program for the PiDACS
+           input/output manager (iomgr).  It connects to a PiDACS server
+           (pidacs-s) over a network to receive iomgr messages/data and send
+           user requests to the iomgr.
+   USAGE:  pidacs-c is executed from the command line with options specified in
+           the argsandlogs module augmented by the code below.  It is
+           compatible with Python 2.7.16 and all versions of Python 3.x.
+  AUTHOR:  papamac
+ VERSION:  1.0.3
+    DATE:  January 5, 2020
 
-Copyright (c) 2018-2019 David A. Krause, aka papamac
+
+MIT LICENSE:
+
+Copyright (c) 2018-2020 David A. Krause, aka papamac
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -23,35 +37,37 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-DESCRIPTION
+
+DESCRIPTION:
+
+****************************** needs work *************************************
+
+DEPENDENCIES/LIMITATIONS:
+
+****************************** needs work *************************************
 
 """
 __author__ = 'papamac'
-__version__ = '1.0.0'
-__date__ = 'December 12, 2019'
+__version__ = '1.0.3'
+__date__ = 'January 5, 2020'
 
 
-from logging import getLogger
-from socket import create_connection, gethostname
+from socket import gethostname
 
-from argsandlogs import AL
-from colortext import *
-from messagesocket import MessageSocket, SOCKET_TIMEOUT
-from nbi import NBI
-
-
-# Globals:
-
-LOG = getLogger('Plugin.pidacs-c')
-
-STATUS_INTERVAL = 600.0                     # iomgr status reporting interval.
-SERVER_TIMEOUT = STATUS_INTERVAL + 10.0     # Timeout must be longer than the
-#                                             status reporting interval to
-#                                             avoid timeouts from an idle
-#                                             server.
+from papamaclib.argsandlogs import AL
+from papamaclib.colortext import getLogger
+from papamaclib.messagesocket import MessageSocket, STATUS_INTERVAL
+from papamaclib.nbi import NBI
 
 
-def log_message(message):
+# Global constant:
+
+LOG = getLogger('Plugin')
+
+
+# pidacs-c function:
+
+def log_message(reference_name, message):
     message_split = message.split(maxsplit=1)
     level = int(message_split[0])
     LOG.log(level, message_split[1])
@@ -61,28 +77,17 @@ def log_message(message):
 
 AL.parser.add_argument('server', nargs='?', default=gethostname(),
                        help='FQDN or IPv4 address of the PiDACS server')
-AL.parser.add_argument('-P', '--port_number',
-                       help='%s port number' % AL.name)
+AL.parser.add_argument('-P', '--port_number', help='%s port number' % AL.name)
 AL.start()
-address_tuple = AL.args.server, AL.args.port_number
-try:
-    server_socket = create_connection(address_tuple, SOCKET_TIMEOUT)
-except OSError as oserr:
-    LOG.error(ct(BRED, 'connection error %s "%s:%s" %s'
-                 % (oserr.errno, AL.args.server, AL.args.port_number,
-                    oserr.strerror)))
-else:
-    server = MessageSocket(AL.args.server, server_socket,
-                           process_message=log_message,
-                           recv_timeout=SERVER_TIMEOUT)
-    LOG.info(ct(BGREEN, 'connected "%s"' % server.name))
-    server.send(gethostname())
-    server.start()
 
+server = MessageSocket(AL.name, process_message=log_message,
+                       recv_timeout=STATUS_INTERVAL + 10.0)
+server.connect_to_server(AL.args.server, AL.args.port_number)
+if server.connected:
+    server.start()
     NBI.start()
-    LOG.info(ct(BBLUE, 'starting %s interactive session'
-                       '\nenter requests: [channel_name request_id '
-                       'argument] or [quit]' % AL.name))
+    LOG.blue('starting %s interactive session\nenter requests: '
+             '[channel_name request_id argument] or [quit]' % AL.name)
     try:
         while server.running:
             user_request = NBI.get_input()

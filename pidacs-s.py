@@ -1,9 +1,26 @@
 #!/usr/bin/python3
-
 """
-MIT LICENSE
+ PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
+  MODULE:  pidacs-s.py
+   TITLE:  PiDACS server main program (pidacs-s)
+FUNCTION:  pidacs-s is a versatile server program for the PiDACS input/output
+           manager (iomgr).  It serves data from the iomgr to remote PiDACS
+           clients (e.g., pidacs-c or the indigo PiDACS-Bridge plugin) and
+           accepts requests from the clients and passes them to the iomgr.  It
+           can also accept iomgr requests interactively from the command line
+           and display iomgr messages/data to the user.
+   USAGE:  pidacs-s is executed from the command line with options specified in
+           the argsandlogs module augmented by the code below.  It can also
+           be executed as a daemon by using the pidacsd shell script.  It is
+           compatible with Python 2.7.16 and all versions of Python 3.x.
+  AUTHOR:  papamac
+ VERSION:  1.0.2
+    DATE:  January 3, 2020
 
-Copyright (c) 2018-2019 David A. Krause, aka papamac
+
+MIT LICENSE:
+
+Copyright (c) 2018-2020 David A. Krause, aka papamac
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -23,97 +40,39 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-DESCRIPTION
+
+DESCRIPTION:
+
+****************************** needs work *************************************
+
+DEPENDENCIES/LIMITATIONS:
+
+****************************** needs work *************************************
 
 """
 __author__ = 'papamac'
-__version__ = '1.0.0'
-__date__ = 'December 12, 2019'
+__version__ = '1.0.2'
+__date__ = 'January 3, 2020'
 
 
-from logging import getLogger
 from signal import signal, SIGTERM
-from socket import *
-from threading import Thread
 
-from argsandlogs import AL
-from colortext import *
 from iomgr import IOMGR
-from messagesocket import MessageSocket, SOCKET_TIMEOUT
-from nbi import NBI
+from papamaclib.argsandlogs import AL
+from papamaclib.colortext import getLogger
+from papamaclib.messagesocket import MessageServer
+from papamaclib.nbi import NBI
 
 
-# Globals:
+# Global constant:
 
-LOG = getLogger('Plugin.pidacs-s')
+LOG = getLogger('Plugin')
 
 
-class Server:
-    """
-    """
-    running = False
-    _socket = None
-    _accept = None
-    _serve = None
-    _clients = []
+# pidacs-s function:
 
-    @classmethod
-    def start(cls):
-        cls._accept = Thread(name='accept_client_connections',
-                             target=cls._accept_client_connections)
-        cls._serve = Thread(name='serve_clients',
-                            target=cls._serve_clients)
-        cls.running = True
-        cls._accept.start()
-        cls._serve.start()
-        signal(SIGTERM, cls.terminate)
-
-    @classmethod
-    def stop(cls):
-        cls._accept.join()
-        cls._serve.join()
-        for client in cls._clients:
-            client.stop()
-
-    @classmethod
-    def terminate(cls, *args):
-        cls.running = False
-
-    @classmethod
-    def _accept_client_connections(cls):
-        cls._socket = socket(AF_INET, SOCK_STREAM)
-        cls._socket.settimeout(SOCKET_TIMEOUT)
-        cls._socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        cls._socket.bind(('', AL.args.port_number))
-        cls._socket.listen(5)
-        ipv4, port = cls._socket.getsockname()
-        name = '%s[%s:%s]' % (gethostname(), ipv4, port)
-        LOG.info(ct(BGREEN, 'accepting client connections "%s"' % name))
-        while cls.running:
-            try:
-                client_socket, client_address_tuple = cls._socket.accept()
-            except timeout:
-                continue
-            client = MessageSocket('', client_socket,
-                                   process_message=IOMGR.process_request)
-            client_hostname = client.recv()
-            if client_hostname:
-                client.update_name(client_hostname + client.name)
-                LOG.info(ct(BGREEN, 'connected "%s"' % client.name))
-                client.start()
-                cls._clients.append(client)
-            else:
-                LOG.error(ct(BRED, 'connection aborted "%s"' % client.name))
-                client.stop()
-
-    @classmethod
-    def _serve_clients(cls):
-        while cls.running:
-            message = IOMGR.get_message()
-            if message:
-                for client in cls._clients:
-                    if client.running:
-                        client.send(message)
+def terminate(*args):
+    server.running = False
 
 
 # pidacs-s main program:
@@ -128,23 +87,28 @@ AL.parser.add_argument('-d', '--daemon', action='store_true',
 AL.start()
 IOMGR.start()
 if IOMGR.running:
-    Server.start()
+    server = MessageServer(AL.args.port_number,
+                           get_message=IOMGR.get_message,
+                           process_request=IOMGR.process_request)
+    server.start()
+    signal(SIGTERM, terminate)
+
     if not AL.args.daemon:
         NBI.start()
-        LOG.info(ct(BBLUE, 'starting %s interactive session'
-                           '\nenter requests: [channel_name request_id '
-                           'argument] or [quit]' % AL.name))
+        LOG.blue('starting %s interactive session\nenter requests: '
+                 '[channel_name request_id argument] or [quit]' % AL.name)
     try:
-        while Server.running:
+        while server.running:
             if not AL.args.daemon:
                 user_request = NBI.get_input()
                 if user_request:
                     if 'quit'.startswith(user_request.lower()):
-                        Server.running = False
+                        server.running = False
                     else:
-                        IOMGR.process_request(user_request)
+                        IOMGR.process_request('local pidacs-s', user_request)
     except KeyboardInterrupt:
         pass
-    Server.stop()
+
+    server.stop()
     IOMGR.stop()
 AL.stop()
