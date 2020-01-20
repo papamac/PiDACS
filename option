@@ -6,11 +6,10 @@
 # FUNCTION:  Install the PiDACS server daemon in /etc/init.d, link it for
 #            automatic startup on reboot, and start it in the current boot
 #            session.
-#    USAGE:  option_arg='port_names'; source src/pidacs/option or
-#            p2pkg -I 'port_names' PiDACS (see examples below).
+#    USAGE:  Use with papamac's personal package utility (p2pkg).  See below.
 #   AUTHOR:  papamac
-#  VERSION:  1.0.0
-#     DATE:  January 2, 2020
+#  VERSION:  1.0.1
+#     DATE:  January 19, 2020
 #
 #
 # MIT LICENSE:
@@ -38,50 +37,63 @@
 #
 # DESCRIPTION:
 #
-# The option script installs the PiDACS daemon script that has already been
-# downloaded to the src sub-directory of the current working directory
-# (src/pidacs).
-
-
-
-# Specifically, it marks the PiDACS executable files (iomgr.py, pidacs-c.py,
-# and pidacs-s.py) as executable and it creates symbolic links to these
-# executables in the bin sub-directory of the current working directory.
-# Install does not install or start the PiDACS daemon.  Use the option script
-# to do this after the install is complete.
+# The option script installs the PiDACS daemon script (pidacsd) that has
+# already been downloaded to the src sub-directory of the current working
+# directory (src/pidacs).  pidacsd executes the PiDACS server (pidacs-s) in
+# background mode using a unique IP port number and specific set of I/O port
+# names that represent hardware that is installed on the server host.
 #
-# install is designed to be used with papamac's personal package utility
+# Before starting, option checks to see if the PiDACS package has been
+# installed.  If not, it aborts the option execution.  If so, option gets the
+# IP port number from the option_arg variable and the I/O port names from the
+# args variable (see p2pkg script).  If either of these variables are omitted,
+# defaults are assigned.  If the IP port number is not valid, option aborts the
+# script execution.
+#
+# option then copies the pidacsd script from src/pidacs to /etc/initd with a
+# new file name that includes the IP port number.  This allows multiple daemons
+# to be installed on the same host for different IP ports if desired.  It edits
+# he new daemon script to include the I/O port names and the working directory
+# where the pidacs-s executable is located.  Finally, option links the edited
+# script for automatic startup on reboot and restarts the daemon to activate it
+# in the current boot session.
+#
+# option is designed to be used with papamac's personal package utility
 # (p2pkg).  Normally, the PiDACS package is downloaded to the current working
 # directory using ftp (p2pkg -f) or git (p2pkg -g) and then installed
-# (p2pkg -i).  If PiDACS is to be installed in a root-owned directory, p2pkg -i
-# must be executed using sudo.  Usage examples are as follows:
+# (p2pkg -i).  Following this, the daemon can optionally be installed using
+# this option script (p2pkg -o).  Usage examples are as follows:
 #
-# p2pkg -fi PiDACS                      # Download the PiDACS package from the
-#                                         ftp server and install it in the
-#                                         current working directory.
-# cd /usr/local                         # Download the PiDACS package from
-# sudo -E p2pkg -gi PiDACS                github and install it in /usr/local.
+# sudo p2pkg -o PiDACS ab0 ab1          # Install the PiDACS daemon for the
+#                                         defaule IP port number (50000) and
+#                                         port names ab0 and ab1.
+# cd /usr/local                         # Install the PIDACS deamon from
+# sudo p2pkg -O 52000 ga0 gg1             /usr/local/pidacs/src using the IP
+#                                         port number 52000 and port names ga0
+#                                         and gg1.
+# cd /usr/local                         # Same as above, but first download the
+# sudo p2pkg -giO 52000 PiDACS ga0 gg1    PiDACS package from github and
+#                                         install it in /usr/local.
+#
 #
 # DEPENDENCIES/LIMITATIONS:
 #
-# When running install via p2pkg in a sudo environment, sudo -E must be used to
-# preserve the user's HOME directory.  install checks for this and exits if
-# $HOME is /root.  papamac's runtime environment (see bash_aliases) prevents
-# this from hapening by aliasing sudo to sudo -E.
-#
-# ????????????????????????????????
-# If the port_names argument is specified, pidacsd is also installed, linked
-# for automatic startup on reboot, and started in the current boot session.
-# port_names must be a string of three-character I/O port names separated by
-# spaces, e.g., 'ab0 ab1 ga0 gb0'.  This string is edited into the pidacsd
-# script as the argument to the pidacs executable.
+# option must be run using sudo because it copies and edits files in the root-
+# owned directory /etc/init.d.
 #
 ###############################################################################
 
+# Ensure that the PiDACS package has been downloaded and installed.
+
+if [[ ! -f $bin/pidacsd ]]; then
+    errmsg "option: $pkg_name not installed; option aborted"
+    echo_exit 1
+fi
+
 # Get the IP port number from the option_arg variable and the I/O port names
-# from the args variable.  Substitute defaults if the arguments are omitted or
-# contain incorrect values.  Append the port number to the daemon script name
-# to uniquely identify the daemon.
+# from the args variable.  Substitute defaults if the arguments are omitted.
+# Check for a valid IP port number and, if ok, append it to the daemon script
+# filename to uniquely identify the daemon.
 
 declare -i port_number=${option_arg:-50000}
 if [[ $(((port_number < 49152) || (port_number > 65535))) = 1 ]]; then
@@ -93,19 +105,19 @@ daemon_name=pidacsd$port_number
 daemon_file=/etc/init.d/$daemon_name
 port_names=${args:-'gg0 gg1'}
 
-# Edit the daemon script to override the hard coded defaults for the port names
-# and the usr directory.  These values are hard coded in the script because
-# init.d executes pidacsd without any arguments.  Install the edited script in
-# /etc/init.d, make it executable, and link it for automatic startup on reboot.
+# Copy the daemon script from src/pidacs to /etc/init.d and assign the new
+# filename with the IP port number.  Edit the script file to override the hard
+# coded defaults for the I/O port names and the working directory.  These
+# defaults are hard coded in the script because init.d executes pidacsd without
+# any arguments.  Link the edited script for automatic startup on reboot.
 
 infomsg "$g${t}option:$n installing daemon $y$t$daemon_name$n with port names $y$t$port_names$n"
 cp $pkg/pidacsd $daemon_file
 cmds="s|gg0 gg1|$port_names|;s|/usr/local|$PWD|;"
 sed -i "$cmds" $daemon_file
-chmod +x $daemon_file
 sudo update-rc.d $daemon_name defaults
 
-# Restart the PiDACS server daemon in the current boot session.
+# Restart the daemon to activate it in the current boot session.
 
 $daemon_file restart
 exit_status=$?

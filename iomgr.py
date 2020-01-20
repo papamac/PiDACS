@@ -968,12 +968,11 @@ class IOMGR:
         LOG.debug('validated [%s %s %s]'
                   % (channel_name, request_id, argument))
 
-        # Execute the request immediately if it does not
-        # require physical hardware I/O (e.g., alias, change, interval).  These
-        # requests execute quickly and will not delay sequential request
-        # processing with I/O waits.  Immediate execution of alias requests
-        # also ensures that subsequent requests for an aliased channel are
-        # recognized.
+        # Execute the request immediately if it does not require physical
+        # hardware I/O (e.g., alias, change, interval).  These requests execute
+        # quickly and will not delay sequential request processing with I/O
+        # waits.  Immediate execution of alias requests also ensures that
+        # subsequent requests for an aliased channel are recognized.
 
         # If the request may incur I/O delays, queue it to the appropriate port
         # thread for concurrent execution.  I/O requests will be executed in

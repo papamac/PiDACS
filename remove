@@ -1,15 +1,15 @@
 ###############################################################################
 #
-#  PACKAGE:  papamac's bash scripts and runtime environment (scripts)
+#  PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
 #     FILE:  remove
-#    TITLE:  Remove the scripts package
-# FUNCTION:  Restore system files to their state before any installationss by
+#    TITLE:  Remove the PiDACS package
+# FUNCTION:  Restore system files to their state before any installations by
 #            the install or option scripts.
-#    USAGE:  source src/scripts/remove or p2pkg -r scripts (see examples
+#    USAGE:  Use with papamac's personal package utility (p2pkg).  See below.
 #            below).
 #   AUTHOR:  papamac
-#  VERSION:  1.0.0
-#     DATE:  January 2, 2020
+#  VERSION:  1.0.1
+#     DATE:  January 18, 2020
 #
 #
 # MIT LICENSE:
@@ -41,31 +41,25 @@
 # directories.  It also stops all PiDACS daemons and removes the daemon files/
 # links.
 #
-# remove is designed to be used with p2pkg.  Usage examples are as follows:
+# remove is designed to be used with p2pkg.  Usage is as follows:
 #
-# sudo -E p2pkg -r PiDACS               # Remove the PiDACS package from the
-#                                         HOME and current working directories
-#                                         and restore /etc/netatalk/afp.conf.
-# cd /usr/local                         # Remove the scripts package from the
-# sudo -E p2pkg -ru /usr/local scripts    HOME and /usr/local directories and
-#                                         restore /etc/netatalk/afp.conf.
+# sudo p2pkg -r PiDACS                  # Remove the PiDACS package files and
+#                                         directories from the current working
+#                                         directory and /etc/init.d.
 #
 #
 # DEPENDENCIES/LIMITATIONS:
 #
 # Because it changes files and directories owned by root, p2pkg -r must be
-# executed using sudo.  Also, sudo -E must be used to preserve the user's HOME
-# directory.  remove checks for this and exits if $HOME is /root.  papamac's
-# runtime environment (see bash_aliases) prevents this from hapening by
-# aliasing sudo to sudo -E.
+# executed using sudo.
 #
 ###############################################################################
 
-log=/var/local/log                  # log directory.
+log=/var/local/log                      # log directory.
 
 # Remove the PiDACS files.
 
-infomsg "$g${t}remove:$n removing PiDACS files and directories from $b$t$PWD$n"
+infomsg "$g${t}remove:$n removing $pkg_name files and directories from $b$t$PWD$n"
 rm -f $bin/iomgr $bin/pidacs-c $bin/pidacs-s $bin/pidacsd
 rm -fr $pkg
 rm -fr $log/iomgr

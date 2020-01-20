@@ -16,10 +16,12 @@
 #     FILE:  pidacsd
 #    TITLE:  PiDACS server daemon script (pidacsd)
 # FUNCTION:  start, stop, or restart an instance of the PiDACS server daemon.
-#    USAGE:  source src/pidacs/install or p2pkg -i pidacs (see examples below).
+#    USAGE:  pidacsd is installed using the option script.  It is executed
+#            automatically by the system initialization daemon (init.d) and
+#            from the command line (see usage examples below).
 #   AUTHOR:  papamac
-#  VERSION:  1.0.0
-#     DATE:  January 2, 2020
+#  VERSION:  1.0.1
+#     DATE:  January 19, 2020
 #
 #
 # MIT LICENSE:
