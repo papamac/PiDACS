@@ -6,7 +6,7 @@
 # FUNCTION:  Install, enable, and start the PiDACS server daemon using systemd.
 #    USAGE:  Use with papamac's personal package utility (p2pkg).  See below.
 #   AUTHOR:  papamac
-#  VERSION:  1.0.5
+#  VERSION:  1.0.6
 #     DATE:  April 16, 2020
 #
 #
@@ -83,7 +83,7 @@
 #                                         defaule IP port number and port names
 #                                         ab0 and ab1.
 # cd /usr/local                         # Install the PIDACS deamon from
-# sudo p2pkg -O 52000 PiDACS ga0 gg1      /usr/local/pidacs/src using the IP
+# sudo p2pkg -O 52000 PiDACS ga0 gg1      /usr/local/src/pidacs using the IP
 #                                         port number 52000 and port names ga0
 #                                         and gg1.
 # cd /usr/local                         # Same as above, but first download the
