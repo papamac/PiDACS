@@ -36,6 +36,7 @@
       <w>recvd</w>
       <w>seqop</w>
       <w>strerr</w>
+      <w>systemd</w>
     </words>
   </dictionary>
 </component>

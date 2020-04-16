@@ -20,6 +20,8 @@
       <option name="ignoredIdentifiers">
         <list>
           <option value="int.isnumeric" />
+          <option value="iomgr.RPi" />
+          <option value="i2cbus.smbus" />
         </list>
       </option>
     </inspection_tool>

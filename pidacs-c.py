@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """
  PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
   MODULE:  pidacs-c.py
@@ -11,8 +11,8 @@ FUNCTION:  pidacs-c is a remote, interactive client program for the PiDACS
            the argsandlogs module augmented by the code below.  It is
            compatible with Python 2.7.16 and all versions of Python 3.x.
   AUTHOR:  papamac
- VERSION:  1.0.3
-    DATE:  January 5, 2020
+ VERSION:  1.0.4
+    DATE:  April 7, 2020
 
 
 MIT LICENSE:
@@ -48,8 +48,8 @@ DEPENDENCIES/LIMITATIONS:
 
 """
 __author__ = 'papamac'
-__version__ = '1.0.3'
-__date__ = 'January 5, 2020'
+__version__ = '1.0.4'
+__date__ = 'April 7, 2020'
 
 
 from socket import gethostname
@@ -76,9 +76,11 @@ def log_message(reference_name, message):
 # pidacs-c main program:
 
 AL.parser.add_argument('server', nargs='?', default=gethostname(),
-                       help='FQDN or IPv4 address of the PiDACS server')
-AL.parser.add_argument('-P', '--port_number', help='%s port number' % AL.name)
-AL.start()
+                       help='server FQDN or IPv4 address')
+AL.parser.add_argument('-P', '--port_number', type=int,
+                       choices=range(50000, 60000, 1000), default=50000,
+                       help='server port number')
+AL.start(__version__)
 
 server = MessageSocket(AL.name, process_message=log_message,
                        recv_timeout=STATUS_INTERVAL + 10.0)

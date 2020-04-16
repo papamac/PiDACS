@@ -1,7 +1,7 @@
 """
 MIT LICENSE
 
-Copyright (c) 2018-2019 David A. Krause, aka papamac
+Copyright (c) 2018-2020 David A. Krause, aka papamac
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,8 +25,8 @@ DESCRIPTION
 
 """
 __author__ = 'papamac'
-__version__ = '1.0.0'
-__date__ = 'December 12, 2019'
+__version__ = '1.0.1'
+__date__ = 'March 19, 2020'
 
 from smbus import SMBus
 
@@ -43,4 +43,4 @@ def _get_i2c_revision():
     return 0 if _get_raspberry_pi_revision() in ('0002', '0003') else 1
 
 
-I2CBUS = SMBus(_get_i2c_revision())
+i2cbus = SMBus(_get_i2c_revision())

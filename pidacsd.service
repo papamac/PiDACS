@@ -1,0 +1,27 @@
+###############################################################################
+#
+#  PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
+#     FILE:  pidacsd.service
+#    TITLE:  systemd unit file for the PiDACS server daemon (pidacsd)
+# FUNCTION:  Specifies parameters for automated startup/shutdown of the PiDACS
+#            server daemon by systemd.
+#    USAGE:  Copied, edited, enabled and started by the option script.
+#   AUTHOR:  papamac
+#  VERSION:  1.0.2
+#     DATE:  April 13, 2020
+#
+###############################################################################
+
+[Unit]
+Description=PiDACS server daemon
+# Requires=pigpiod
+# After=poigpiod
+
+[Service]
+Type=forking
+PIDFile=/run/pidacsd.pid
+ExecStart=/usr/local/bin/pidacs-s -d -l DATA gg0 gg1
+
+[Install]
+Alias=/usr/local/lib/systemd/system/pidacs.service
+WantedBy=multi-user.target

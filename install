@@ -6,8 +6,8 @@
 # FUNCTION:  Install PiDACS files in the current working drectory.
 #    USAGE:  Use with papamac's personal package utility (p2pkg).  See below.
 #   AUTHOR:  papamac
-#  VERSION:  1.0.1
-#     DATE:  January 18, 2020
+#  VERSION:  1.0.3
+#     DATE:  April 15, 2020
 #
 #
 # MIT LICENSE:
@@ -22,7 +22,7 @@
 # furnished to do so, subject to the following conditions:
 #
 # The above copyright notice and this permission notice shall be included in
-# allcopies or substantial portions of the Software.
+# all copies or substantial portions of the Software.
 #
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -45,12 +45,11 @@
 # src/papamaclib.
 #
 # To install the PiDACS package, the script marks the files iomgr.py,
-# pidacs-c.py, pidacs-s.py, and pidacsd as executable and creates symbolic
-# links to these executables in the bin sub-directory of the current working
-# directory.
+# pidacs-c.py, and pidacs-s.py as executable and creates symbolic links to
+# these executables in the bin sub-directory of the current working directory.
 #
-# install does not install or start the PiDACS daemon (pidacsd).  Use the
-# option script to do this after the install is complete.
+# install does not install or start the PiDACS server daemon.  Use the option
+# script to do this after the install is complete.
 #
 # install is designed to be used with papamac's personal package utility
 # (p2pkg).  The PiDACS package is downloaded to the current working directory
@@ -68,7 +67,7 @@
 # Ensure that the papamaclib package has been downloaded.
 
 if [[ ! -d $src/papamaclib ]]; then
-    errmsg "install: papamaclib not downloaded; $pkg_name install aborted"
+    errmsg "install: papamaclib not downloaded; $m$t$pkg_name$n install aborted"
     echo_exit 1
 fi
 
@@ -79,9 +78,8 @@ ln -fs $src/papamaclib $pkg
 
 # Set executable bits in and create links.
 
-infomsg "$g${t}install:$n creating $pkg_name executable links in $b$t$bin$n"
-chmod +x $pkg/iomgr.py $pkg/pidacs-c.py $pkg/pidacs-s.py $pkg/pidacsd
-ln -fs   $pkg/iomgr.py    $bin/iomgr
-ln -fs   $pkg/pidacs-c.py $bin/pidacs-c
-ln -fs   $pkg/pidacs-s.py $bin/pidacs-s
-ln -fs   $pkg/pidacsd     $bin/pidacsd
+infomsg "$g${t}install:$n creating $m$t$pkg_name$n executable links in $b$t$bin$n"
+chmod +x $pkg/iomgr.py $pkg/${pkg_name_lower}*.py
+ln -fs   $pkg/iomgr.py $bin/iomgr
+ln -fs   $pkg/${pkg_name_lower}-c.py $bin/${pkg_name_lower}-c
+ln -fs   $pkg/${pkg_name_lower}-s.py $bin/${pkg_name_lower}-s

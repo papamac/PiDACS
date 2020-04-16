@@ -8,8 +8,8 @@
 #    USAGE:  Use with papamac's personal package utility (p2pkg).  See below.
 #            below).
 #   AUTHOR:  papamac
-#  VERSION:  1.0.1
-#     DATE:  January 18, 2020
+#  VERSION:  1.0.2
+#     DATE:  April 16, 2020
 #
 #
 # MIT LICENSE:
@@ -24,7 +24,7 @@
 # furnished to do so, subject to the following conditions:
 #
 # The above copyright notice and this permission notice shall be included in
-# allcopies or substantial portions of the Software.
+# all copies or substantial portions of the Software.
 #
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -38,8 +38,8 @@
 # DESCRIPTION:
 #
 # The remove script removes all PiDACS files from the current working
-# directories.  It also stops all PiDACS daemons and removes the daemon files/
-# links.
+# directory.  It also stops the PiDACS server daemon and disables/deletes the
+# the daemon unit file.
 #
 # remove is designed to be used with p2pkg.  Usage is as follows:
 #
@@ -56,24 +56,26 @@
 ###############################################################################
 
 log=/var/local/log                      # log directory.
+daemon_name=${pkg_name_lower}d          # daemon name.
+daemon_unit=$daemon_name.service        # systemd unit file for the daemon.
+systemd=/usr/local/lib/systemd/system   # user library on the systemd search
+#                                         path.
 
 # Remove the PiDACS files.
 
-infomsg "$g${t}remove:$n removing $pkg_name files and directories from $b$t$PWD$n"
-rm -f $bin/iomgr $bin/pidacs-c $bin/pidacs-s $bin/pidacsd
+infomsg "$g${t}remove:$n removing $m$t$pkg_nam$n files and directories from $b$t$PWD$n and $b$t$log$n"
+rm -f $bin/iomgr $bin/${pkg_name_lower}*
 rm -fr $pkg
-rm -fr $log/iomgr
-rm -fr $log/pidacs-c
-rm -fr $log/pidacs-s
+rm -f $log/iomgr*
+rm -f $log/${pkg_name_lower}*
 
-# Stop all PiDACS daemons and remove the daemon scripts/links.
+# Stop the PiDACS daemon and disable the daemon unit.
 
-infomsg "$g${t}remove:$n stopping daemons and removing files in $b$t/etc/init.d$n"
-for daemon_file in /etc/init.d/pidacsd*; do
-    if [[ -f $daemon_file ]]; then
-        $daemon_file stop
-        rm -f $daemon_file
-        update-rc.d $daemon_file remove
-    fi
-done
-rm -f /var/run/pidacsd*.pid
+infomsg "$g${t}option:$n stopping $m$t$daemon_name$n and disabling $b$t$daemon_unit$n"
+systemctl stop $daemon_name
+systemctl disable $daemon_unit
+
+# Remove the daemon unit files from /usr/local/lib/systemd/system.
+
+infomsg "$g${t}option:$n removing daemon unit files from $b$t$systemd$n"
+rm -f $systemd/${pkg_name_lower}*.service
