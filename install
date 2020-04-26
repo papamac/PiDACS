@@ -6,8 +6,8 @@
 # FUNCTION:  Install PiDACS files in the current working drectory.
 #    USAGE:  Use with papamac's personal package utility (p2pkg).  See below.
 #   AUTHOR:  papamac
-#  VERSION:  1.0.3
-#     DATE:  April 15, 2020
+#  VERSION:  1.0.4
+#     DATE:  April 22, 2020
 #
 #
 # MIT LICENSE:
@@ -45,7 +45,7 @@
 # src/papamaclib.
 #
 # To install the PiDACS package, the script marks the files iomgr.py,
-# pidacs-c.py, and pidacs-s.py as executable and creates symbolic links to
+# pidacs.py, and pidacs-c.py as executable and creates symbolic links to
 # these executables in the bin sub-directory of the current working directory.
 #
 # install does not install or start the PiDACS server daemon.  Use the option
@@ -81,5 +81,5 @@ ln -fs $src/papamaclib $pkg
 infomsg "$g${t}install:$n creating $m$t$pkg_name$n executable links in $b$t$bin$n"
 chmod +x $pkg/iomgr.py $pkg/${pkg_name_lower}*.py
 ln -fs   $pkg/iomgr.py $bin/iomgr
+ln -fs   $pkg/${pkg_name_lower}.py $bin/${pkg_name_lower}
 ln -fs   $pkg/${pkg_name_lower}-c.py $bin/${pkg_name_lower}-c
-ln -fs   $pkg/${pkg_name_lower}-s.py $bin/${pkg_name_lower}-s

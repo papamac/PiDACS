@@ -5,14 +5,14 @@
    TITLE:  PiDACS interactive client main program
 FUNCTION:  pidacs-c is a remote, interactive client program for the PiDACS
            input/output manager (iomgr).  It connects to a PiDACS server
-           (pidacs-s) over a network to receive iomgr messages/data and send
+           (pidacs) over a network to receive iomgr messages/data and send
            user requests to the iomgr.
    USAGE:  pidacs-c is executed from the command line with options specified in
            the argsandlogs module augmented by the code below.  It is
            compatible with Python 2.7.16 and all versions of Python 3.x.
   AUTHOR:  papamac
- VERSION:  1.0.4
-    DATE:  April 7, 2020
+ VERSION:  1.0.5
+    DATE:  April 22, 2020
 
 
 MIT LICENSE:

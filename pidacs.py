@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
  PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
-  MODULE:  pidacs-s.py
-   TITLE:  PiDACS server main program (pidacs-s)
-FUNCTION:  pidacs-s is a versatile server program for the PiDACS input/output
+  MODULE:  pidacs.py
+   TITLE:  PiDACS server main program (pidacs)
+FUNCTION:  pidacs is a versatile server program for the PiDACS input/output
            manager (iomgr).  It serves data from the iomgr to remote PiDACS
            clients (e.g., pidacs-c or the indigo PiDACS-Bridge plugin) and
            accepts requests from the clients and passes them to the iomgr.  It
            can also accept iomgr requests interactively from the command line
            and display iomgr messages/data to the user.
-   USAGE:  pidacs-s is executed from the command line with options specified in
+   USAGE:  pidacs is executed from the command line with options specified in
            the argsandlogs module augmented by the code below.  It can also
            be executed as a daemon by using the old_pidacsd shell script.  It is
            compatible with Python 2.7.16 and all versions of Python 3.x.
   AUTHOR:  papamac
- VERSION:  1.0.5
-    DATE:  April 13, 2020
+ VERSION:  1.0.6
+    DATE:  April 22, 2020
 
 
 MIT LICENSE:
@@ -51,8 +51,8 @@ DEPENDENCIES/LIMITATIONS:
 
 """
 __author__ = 'papamac'
-__version__ = '1.0.5'
-__date__ = 'April 13, 2020'
+__version__ = '1.0.6'
+__date__ = 'April 22, 2020'
 
 
 from os import fork
@@ -72,13 +72,13 @@ LOG = getLogger('Plugin')
 PID_PATH = Path('/run/pidacsd.pid')
 
 
-# pidacs-s function:
+# pidacs function:
 
 def terminate(*args):
     server.running = False
 
 
-# pidacs-s main program:
+# pidacs main program:
 
 AL.parser.add_argument('port_names', nargs='+',
                        help='string of IO port names separated by spaces')
@@ -116,7 +116,7 @@ if IOMGR.running:
                     if 'quit'.startswith(user_request.lower()):
                         server.running = False
                     else:
-                        IOMGR.process_request('local pidacs-s', user_request)
+                        IOMGR.process_request('local pidacs', user_request)
     except KeyboardInterrupt:
         pass
 

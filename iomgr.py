@@ -6,13 +6,13 @@
 FUNCTION:  iomgr provides classes and methods to perform input and output
            operations for a variety of data acquisition and control devices on
            a Raspberry Pi.
-   USAGE:  iomgr is imported and used within main programs (e.g., pidacs-s).
+   USAGE:  iomgr is imported and used within main programs (e.g., pidacs).
            The module also includes an interactive main program that can be
            executed from the command line for testing purposes.  It is
            compatible with Python 2.7.16 and all versions of Python 3.x.
   AUTHOR:  papamac
- VERSION:  1.0.5
-    DATE:  April 7, 2020
+ VERSION:  1.0.7
+    DATE:  April 26, 2020
 
 
 MIT LICENSE:
@@ -42,7 +42,7 @@ DESCRIPTION:
 
 ****************************** needs work *************************************
 
-iomgr version 1.0.0 is an initial operational version that supports analog
+iomgr version 1.0.7 is an initial operational version that supports analog
 input and digital input/output.  Documentation is incomplete.
 
 Device characteristics for current and soon to be supported I/O devices are as
@@ -86,8 +86,8 @@ DEPENDENCIES/LIMITATIONS:
 
 """
 __author__ = 'papamac'
-__version__ = '1.0.5'
-__date__ = 'April 7, 2020'
+__version__ = '1.0.7'
+__date__ = 'April 26, 2020'
 
 
 from datetime import datetime
@@ -155,12 +155,10 @@ RESOLUTION = 12             # ADC resolution is 12, 14, 16, or 18 bits.
 #                             DEFAULT is 12 bits.
 GAIN = 1                    # ADC gain is 1, 2, 4, or 8.
 #                             DEFAULT is 1.
-SCALING = (6.8 + 10) / 6.8  # The ADC scaling factor can be any real number
+SCALING = 1.0               # The ADC scaling factor can be any real number
 #                             providing appropriate scaling for the sensor
 #                             circuit being measured by an individual analog
-#                             channel.
-#                             DEFAULT is for 5V single ended channels on the
-#                             AB Electronics ADC Pi Plus board.
+#                             channel.  DEFAULT is 1.0.
 
 # DEFAULT operational arguments for channel momentary contact and write
 # methods.  These are used in the the IOMGR._REQUESTS dictionary to specify
@@ -225,6 +223,7 @@ REQUESTS = {'alias':       {'*':        None},
                             'stop':     STOP,        '1':        1,
                             '0':        0},
             'read':        {'DEFAULT':  None},
+            'reset':       {'DEFAULT':  None},
             'resolution':  {'DEFAULT':  RESOLUTION,  '12':       12,
                             '14':       14,          '16':       16,
                             '18':       18},
@@ -232,6 +231,8 @@ REQUESTS = {'alias':       {'*':        None},
             'write':       {'DEFAULT':  WRITE,       'off':      OFF,
                             'on':       ON,          'false':    FALSE,
                             'true':     TRUE,        '<=':       5}}
+
+SPECIAL_SHORTCUTS = {'d': 'direction', 'r': 'read', 'res': 'resolution'}
 
 
 class Port(Thread):
@@ -333,18 +334,35 @@ class Channel:
         self.port = port
         self._name = name
         self._alt_name = alt_name
-        self.id = name
+        self.channels[name] = self
+        if alt_name:
+            self.channels[alt_name] = self
+
+        self._direction = None
+        self.id = self.change_ = self.interval_ = None
+        self.prior_report = self.prior_value = self.value = None
+
+        self.__init()
+
+    def __init(self):
+        self.id = self._name
         self.change_ = CHANGE
         self.interval_ = INTERVAL
         self.prior_report = datetime.now()
         self.prior_value = None
         self.value = None
 
-        self._direction = INPUT
-
-        self.channels[name] = self
-        if alt_name:
-            self.channels[alt_name] = self
+    def _reset(self):
+        warning = 'channel %s reset to default configuration' % self._name
+        IOMGR.queue_message(WARNING, warning)
+        for channel_name in self.channels:
+            if channel_name not in (self._name, self._alt_name):
+                if self.channels[channel_name] is self:
+                    warning = 'channel %s alias %s deleted' % (self._name,
+                                                               channel_name)
+                    IOMGR.queue_message(WARNING, warning)
+                    del self.channels[channel_name]
+        self.__init()
 
     @staticmethod
     def _check_bitval(bitval):
@@ -417,15 +435,20 @@ class BCM283X(Port):
         def __init__(self, port, name, alt_name):
             Channel.__init__(self, port, name, alt_name)
             self._number = int(name[2:])
-            self._pullup = None
+
+            self._pullup = self._polarity = None
+            self._dutycycle = self._frequency = self._pwm = None
+            self._save_change = self._save_interval = None
+            self._init()
+
+        def _init(self):
+            self._pullup = PULLUP
             self._polarity = POLARITY
             self._dutycycle = DUTYCYCLE
             self._frequency = FREQUENCY
             self._pwm = None
             self._save_change = self.change_
             self._save_interval = self.interval_
-
-            # Set default channel configuration and read channel value.
 
             self.pullup(PULLUP)
             self.direction(DIRECTION)
@@ -494,6 +517,11 @@ class BCM283X(Port):
                         self._pwm = None
                         self.change_ = self._save_change
                         self.interval_ = self._save_interval
+
+        def reset(self):
+            self._reset()
+            self.pwm(STOP)
+            self._init()
 
         def read(self, *args):
             value = self.read_hw()
@@ -631,6 +659,7 @@ class MCP230XX(Port):
         direction:  sets channel direction (input/output)
         polarity:   sets channel polarity
         pullup:     sets channel pullup configuration
+        reset:      reset channel configuration to default attributes
         read:       reads a single bit value
         write:      writes a single bit value
         momentary:  momentarily turns an output channel on and then off
@@ -646,14 +675,16 @@ class MCP230XX(Port):
             Channel.__init__(self, port, name)
 
             self.number = int(name[3])
+            self._direction = None
 
             self._iodir = port.registers['IODIR']
             self._ipol = port.registers['IPOL']
             self._gppu = port.registers['GPPU']
             self._gpio = port.registers['GPIO']
 
-            # Set default channel configuration and read channel value.
+            self._init()
 
+        def _init(self):
             self.direction(DIRECTION)
             self.polarity(POLARITY)
             self.pullup(PULLUP)
@@ -684,6 +715,10 @@ class MCP230XX(Port):
             if self._check_direction(INPUT):
                 if self._check_bitval(pullup):
                     self._gppu.update(self.number, pullup)
+
+        def reset(self):
+            self._reset()
+            self._init()
 
         def read(self, *args):
             value = self.read_hw()
@@ -734,14 +769,14 @@ class MCP342X(Port):
             Channel.__init__(self, port, name)
             self._i2c_address = self._I2C_BASE_ADDRESS + int(name[2])
             self._number = int(name[3])
+            self._gain = self._resolution = self._scaling = None
+            self._config = self._num_bytes = self._multiplier = None
+            self._init()
+
+        def _init(self):
             self._gain = GAIN
             self._resolution = RESOLUTION
             self._scaling = SCALING
-            self._config = None
-            self._num_bytes = None
-
-            # Set default channel configuration and read channel value.
-
             self._configure()
             self.read()
 
@@ -751,6 +786,8 @@ class MCP342X(Port):
             self._config = (0x80 + 32 * self._number + 4 * resolution_index
                             + gain_index)
             self._num_bytes = 3 if self._resolution < 18 else 4
+            lsb_value = 4.096 / 2 ** self._resolution
+            self._multiplier = self._scaling * lsb_value / self._gain
 
         # Public methods:
 
@@ -764,10 +801,14 @@ class MCP342X(Port):
 
         def scaling(self, scaling):
             self._scaling = scaling
+            self._configure()
+
+        def reset(self, *args):
+            self._reset()
+            self._init()
 
         def read(self, *args):
-            value = self.read_hw()
-            self._update(value)
+            self._update(self.read_hw())
 
         def read_hw(self):
             i2cbus.write_byte(self._i2c_address, self._config)
@@ -778,10 +819,7 @@ class MCP342X(Port):
                 if bytes_[-1] < 128:
                     break
             counts = int.from_bytes(bytes_[:-1], byteorder='big', signed=True)
-            if counts < 0:
-                counts = 0
-            lsb_value = 4.096 / 2 ** self._resolution
-            return counts * lsb_value / self._gain * self._scaling
+            return max(counts, 0) * self._multiplier
 
 
 class MCP320X:
@@ -916,10 +954,9 @@ class IOMGR:
 
         request_id = rsplit[1]
         rid_match = request_id.lower()
-        if rid_match == 'd':
-            rid_match = 'di'
-        if rid_match == 'r':
-            rid_match = 'rea'
+        if rid_match in SPECIAL_SHORTCUTS:
+            rid_match = SPECIAL_SHORTCUTS[rid_match]
+
         for rid in REQUESTS:
             if rid.startswith(rid_match):
                 request_id = rid
