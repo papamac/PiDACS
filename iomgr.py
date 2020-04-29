@@ -12,7 +12,7 @@ FUNCTION:  iomgr provides classes and methods to perform input and output
            compatible with Python 2.7.16 and all versions of Python 3.x.
   AUTHOR:  papamac
  VERSION:  1.0.7
-    DATE:  April 26, 2020
+    DATE:  April 27, 2020
 
 
 MIT LICENSE:
@@ -68,9 +68,9 @@ follows:
 |-----------|---------------------------------|---------|----------|----------|
 | MCP3208*  | 8-Channel 12-Bit A/D Converter  |    8?   |    ae    |    8     |
 |-----------|---------------------------------|---------|----------|----------|
-| MCP3422,3 | 2-Channel 18-Bit A/D Converter  |    4    |    aa    |    2     |
+| MCP3422,3 | 2-Channel 18-Bit A/D Converter  |    8    |    aa    |    2     |
 |-----------|---------------------------------|---------|----------|----------|
-| MCP3424   | 4-Channel 18-Bit A/D Converter  |    4    |    ab    |    4     |
+| MCP3424   | 4-Channel 18-Bit A/D Converter  |    8    |    ab    |    4     |
 |-----------|---------------------------------|---------|----------|----------|
 | MCP4821*  | 1-Channel 12-Bit D/A Converter  |    8?   |    da    |    1     |
 |-----------|---------------------------------|---------|----------|----------|
@@ -87,7 +87,7 @@ DEPENDENCIES/LIMITATIONS:
 """
 __author__ = 'papamac'
 __version__ = '1.0.7'
-__date__ = 'April 26, 2020'
+__date__ = 'April 27, 2020'
 
 
 from datetime import datetime
@@ -105,7 +105,11 @@ from papamaclib.colortext import getLogger, DATA
 from papamaclib.messagesocket import STATUS_INTERVAL
 from papamaclib.nbi import NBI
 
-# Global constant:
+###############################################################################
+#
+# Global constants
+#
+###############################################################################
 
 LOG = getLogger('Plugin')   # Color logger.
 
@@ -123,6 +127,21 @@ INPUT = 1                   # Channel is a digital input.
 OUTPUT = 0                  # Channel is a digital output.
 DIRECTION = INPUT           # DEFAULT is INPUT
 
+# Options and DEFAULT value for digital channel pullup resistor configuration.
+
+OFF = 0                     # No internal pullup resistor on digital input.
+ON = UP = 1                 # Digital input pulled up to logic high through an
+#                             internal resistor.
+DOWN = 2                    # Digital input pulled down to logic low through an
+#                             internal resistor.  Applicable to BCM GPIO only.
+PULLUP = OFF                # DEFAULT is OFF.
+
+# Options and DEFAULT value for digital channel polarity:
+
+NORMAL = 0                  # Normal logic polarity (logic low = 0, high = 1).
+INVERTED = 1                # Inverted logic polarity (low = 1, high = 0).
+POLARITY = NORMAL           # DEFAULT is NORMAL.
+
 # Options and DEFAULT values for pulse width modulation (PWM):
 
 DUTYCYCLE = 50              # PWM duty cycle in percent (0% - continuous off to
@@ -133,21 +152,6 @@ FREQUENCY = 100             # Pulse frequency in Hz for PWM digital outputs.
 START = 1                   # Start PWM output.
 STOP = 0                    # Stop PWM output and delete current PWM object.
 OPERATION = START           # DEFAULT is START.
-
-# Options and DEFAULT value for digital channel polarity:
-
-NORMAL = 0                  # Normal logic polarity (logic low = 0, high = 1).
-INVERTED = 1                # Inverted logic polarity (low = 1, high = 0).
-POLARITY = NORMAL           # DEFAULT is NORMAL.
-
-# Options and DEFAULT value for digital channel pullup resistor configuration.
-
-OFF = DISABLED = 0          # No internal pullup resistor on digital input.
-ON = ENABLED = UP = 1       # Digital input pulled up to logic high through an
-#                             internal resistor.
-DOWN = 2                    # Digital input pulled down to logic low through an
-#                             internal resistor.  Applicable to BCM GPIO only.
-PULLUP = DISABLED           # DEFAULT is DISABLED.
 
 # Options and DEFAULT values for analog channel configuration parameters:
 
@@ -160,19 +164,10 @@ SCALING = 1.0               # The ADC scaling factor can be any real number
 #                             circuit being measured by an individual analog
 #                             channel.  DEFAULT is 1.0.
 
-# DEFAULT operational arguments for channel momentary contact and write
-# methods.  These are used in the the IOMGR._REQUESTS dictionary to specify
-# default values to be used when a user request omits the argument.
-
-MOMENTARY = 0.2             # The delay time in seconds from a momentary
-#                             channel turn-on to its subsequent turn-off.
-#                             DEFAULT is 0.2 sec.
-WRITE = OFF                 # DEFAULT is OFF.
-
 # Options and DEFAULT values for change detection and interval reporting:
 
-NONE = 0                    # No change detection or interval reporting.
-YES = 1                     # Change detection or interval reporting is
+NONE = FALSE = 0            # No change detection or interval reporting.
+YES = TRUE = 1              # Change detection or interval reporting is
 #                             enabled.
 #                             Any positive, non-zero number (integer or float)
 #                             enables change detection for both analog and
@@ -186,10 +181,17 @@ YES = 1                     # Change detection or interval reporting is
 #                             operate independently.  Either or both can be
 #                             independently enabled or disabled for each
 #                             channel.
-FALSE = 0                   # Same as NONE.
-TRUE = 1                    # Same as YES.
 CHANGE = NONE               # Change detection DEFAULT is NONE.
 INTERVAL = NONE             # Interval reporting DEFAULT is NONE.
+
+# DEFAULT operational arguments for channel momentary contact and write
+# methods.  These are used in the the IOMGR._REQUESTS dictionary to specify
+# default values to be used when a user request omits the argument.
+
+MOMENTARY = 0.2             # The delay time in seconds from a momentary
+#                             channel turn-on to its subsequent turn-off.
+#                             DEFAULT is 0.2 sec.
+WRITE = OFF                 # DEFAULT is OFF.
 
 # Valid request dictionary used in the IOMGR.process_request method.
 
@@ -214,8 +216,7 @@ REQUESTS = {'alias':       {'*':        None},
             'polarity':    {'DEFAULT':  POLARITY,    'normal':   NORMAL,
                             'inverted': INVERTED,    '0':        0,
                             '1': 1},
-            'pullup':      {'DEFAULT':  PULLUP,      'disabled': DISABLED,
-                            'enabled':  ENABLED,     'off':      OFF,
+            'pullup':      {'DEFAULT':  PULLUP,      'off':      OFF,
                             'on':       ON,          'down':     DOWN,
                             'up':       UP,          '0':        0,
                             '1':        1,           '2':        2},
@@ -235,9 +236,17 @@ REQUESTS = {'alias':       {'*':        None},
 SPECIAL_SHORTCUTS = {'d': 'direction', 'r': 'read', 'res': 'resolution'}
 
 
+###############################################################################
+#
+# Base classes and methods: Port, Channel
+#
+###############################################################################
+
 class Port(Thread):
     """
     """
+    ports = []
+
     # Private methods:
 
     def __init__(self, name):
@@ -334,14 +343,8 @@ class Channel:
         self.port = port
         self._name = name
         self._alt_name = alt_name
-        self.channels[name] = self
-        if alt_name:
-            self.channels[alt_name] = self
-
-        self._direction = None
         self.id = self.change_ = self.interval_ = None
         self.prior_report = self.prior_value = self.value = None
-
         self.__init()
 
     def __init(self):
@@ -398,6 +401,12 @@ class Channel:
         self.interval_ = interval
 
 
+###############################################################################
+#
+# BCM283X classes and methods - support for Raspberry Pi GPIO's
+#
+###############################################################################
+
 class BCM283X(Port):
     """
     """
@@ -426,6 +435,8 @@ class BCM283X(Port):
             else:
                 channel = self._Channel(self, pin_name, gpio_name)
             self._channels.append(channel)
+            Channel.channels[gpio_name] = channel
+            Channel.channels[pin_name] = channel
 
     class _Channel(Channel):
         """
@@ -435,8 +446,7 @@ class BCM283X(Port):
         def __init__(self, port, name, alt_name):
             Channel.__init__(self, port, name, alt_name)
             self._number = int(name[2:])
-
-            self._pullup = self._polarity = None
+            self._direction = self._pullup = self._polarity = None
             self._dutycycle = self._frequency = self._pwm = None
             self._save_change = self._save_interval = None
             self._init()
@@ -450,9 +460,16 @@ class BCM283X(Port):
             self._save_change = self.change_
             self._save_interval = self.interval_
 
-            self.pullup(PULLUP)
             self.direction(DIRECTION)
             self.read()
+
+        def _configure(self, direction, pullup):
+            gppu = (gpio.PUD_OFF if pullup is OFF
+                    else gpio.PUD_UP if pullup is UP
+                    else gpio.PUD_DOWN)
+            gpio.setup(self._number, direction, gppu)
+            self._direction = direction
+            self._pullup = pullup
 
         def _apply_polarity(self, bitval):
             if self._polarity:
@@ -462,12 +479,26 @@ class BCM283X(Port):
         def _write_hw(self, bitval):
             gpio.output(self._number, bitval)
 
-        # Public methods:
+        # Public configuration methods: direction, pullup, polarity, reset
 
         def direction(self, direction):
-            pullup = gpio.PUD_OFF if direction is OUTPUT else self._pullup
-            gpio.setup(self._number, direction, pullup)
-            self._direction = direction
+            pullup = self._pullup if direction is INPUT else OFF
+            self._configure(direction, pullup)
+
+        def pullup(self, pullup):
+            if self._check_direction(INPUT):
+                self._configure(self._direction, pullup)
+
+        def polarity(self, polarity):
+            if self._check_direction(INPUT):
+                self._polarity = polarity
+
+        def reset(self):
+            self._reset()
+            self.pwm(STOP)
+            self._init()
+
+        # Public pwm methods: dutycycle, frequency, pwm
 
         def dutycycle(self, dutycycle):
             if self._check_direction(OUTPUT):
@@ -480,24 +511,6 @@ class BCM283X(Port):
                 self._frequency = frequency
                 if self._pwm:
                     self._pwm.ChangeFrequency(self._frequency)
-
-        def momentary(self, delay):
-            if self._check_direction(OUTPUT):
-                self._write_hw(ON)
-                self._update(ON)
-                sleep(delay)
-                self._write_hw(OFF)
-                self._update(OFF)
-
-        def polarity(self, polarity):
-            if self._check_direction(INPUT):
-                self._polarity = polarity
-
-        def pullup(self, pullup):
-            if self._check_direction(INPUT):
-                pu = 0 if pullup is OFF else 1 if pullup is DOWN else 2
-                self._pullup = gpio.PUD_OFF + pu
-                gpio.setup(self._number, self._direction, self._pullup)
 
         def pwm(self, operation):
             if self._check_direction(OUTPUT):
@@ -518,17 +531,14 @@ class BCM283X(Port):
                         self.change_ = self._save_change
                         self.interval_ = self._save_interval
 
-        def reset(self):
-            self._reset()
-            self.pwm(STOP)
-            self._init()
+        # Public digital I/O methods: read_hw, read, write, momentary
+
+        def read_hw(self):
+            return self._apply_polarity(gpio.input(self._number))
 
         def read(self, *args):
             value = self.read_hw()
             self._update(value)
-
-        def read_hw(self):
-            return self._apply_polarity(gpio.input(self._number))
 
         def write(self, bitval):
             if self._check_direction(OUTPUT):
@@ -542,6 +552,20 @@ class BCM283X(Port):
                     self._write_hw(bitval)
                     self._update(bitval)
 
+        def momentary(self, delay):
+            if self._check_direction(OUTPUT):
+                self._write_hw(ON)
+                self._update(ON)
+                sleep(delay)
+                self._write_hw(OFF)
+                self._update(OFF)
+
+
+###############################################################################
+#
+# MCP230XX classes and methods - support for I/O Expander devices
+#
+###############################################################################
 
 class MCP230XX(Port):
     """
@@ -585,6 +609,7 @@ class MCP230XX(Port):
             channel_name = '%s%i' % (name, channel_number)
             channel = self._Channel(self, channel_name)
             self._channels.append(channel)
+            Channel.channels[channel_name] = channel
 
     def _poll(self, dt_now):  # Replaces superclass method.
         for channel in self._channels:
@@ -673,15 +698,12 @@ class MCP230XX(Port):
 
         def __init__(self, port, name):
             Channel.__init__(self, port, name)
-
             self.number = int(name[3])
             self._direction = None
-
             self._iodir = port.registers['IODIR']
             self._ipol = port.registers['IPOL']
             self._gppu = port.registers['GPPU']
             self._gpio = port.registers['GPIO']
-
             self._init()
 
         def _init(self):
@@ -693,11 +715,40 @@ class MCP230XX(Port):
         def _write_hw(self, bitval):
             self._gpio.update(self.number, bitval)
 
-        # Public methods:
+        # Public configuration methods: direction, pullup, polarity, reset
 
         def direction(self, direction):
             self._iodir.update(self.number, direction)
             self._direction = direction
+
+        def pullup(self, pullup):
+            if self._check_direction(INPUT):
+                if self._check_bitval(pullup):
+                    self._gppu.update(self.number, pullup)
+
+        def polarity(self, polarity):
+            if self._check_direction(INPUT):
+                self._ipol.update(self.number, polarity)
+
+        def reset(self):
+            self._reset()
+            self._init()
+
+        # Public digital I/O methods: read_hw, read, write, momentary
+
+        def read_hw(self):
+            bitval = 1 if self._gpio.read() & (1 << self.number) else 0
+            return bitval
+
+        def read(self, *args):
+            value = self.read_hw()
+            self._update(value)
+
+        def write(self, bitval):
+            if self._check_direction(OUTPUT):
+                if self._check_bitval(bitval):
+                    self._write_hw(bitval)
+                    self._update(bitval)
 
         def momentary(self, delay):
             if self._check_direction(OUTPUT):
@@ -707,33 +758,12 @@ class MCP230XX(Port):
                 self._write_hw(OFF)
                 self._update(OFF)
 
-        def polarity(self, polarity):
-            if self._check_direction(INPUT):
-                self._ipol.update(self.number, polarity)
 
-        def pullup(self, pullup):
-            if self._check_direction(INPUT):
-                if self._check_bitval(pullup):
-                    self._gppu.update(self.number, pullup)
-
-        def reset(self):
-            self._reset()
-            self._init()
-
-        def read(self, *args):
-            value = self.read_hw()
-            self._update(value)
-
-        def read_hw(self):
-            bitval = 1 if self._gpio.read() & (1 << self.number) else 0
-            return bitval
-
-        def write(self, bitval):
-            if self._check_direction(OUTPUT):
-                if self._check_bitval(bitval):
-                    self._write_hw(bitval)
-                    self._update(bitval)
-
+###############################################################################
+#
+# MCP342X classes and methods - support for 18-bit A/D converters
+#
+###############################################################################
 
 class MCP342X(Port):
 
@@ -746,6 +776,7 @@ class MCP342X(Port):
             channel_name = '%s%i' % (name, channel_number)
             channel = self._Channel(self, channel_name)
             self._channels.append(channel)
+            Channel.channels[channel_name] = channel
 
     def _value_changed(self, channel):  # Replaces superclass method.
         pval = channel.prior_value
@@ -789,7 +820,7 @@ class MCP342X(Port):
             lsb_value = 4.096 / 2 ** self._resolution
             self._multiplier = self._scaling * lsb_value / self._gain
 
-        # Public methods:
+        # Public configuration methods: gain, resolution, scaling, reset
 
         def gain(self, gain):
             self._gain = gain
@@ -807,8 +838,7 @@ class MCP342X(Port):
             self._reset()
             self._init()
 
-        def read(self, *args):
-            self._update(self.read_hw())
+        # Public analog input methods: read_hw, read
 
         def read_hw(self):
             i2cbus.write_byte(self._i2c_address, self._config)
@@ -819,28 +849,48 @@ class MCP342X(Port):
                 if bytes_[-1] < 128:
                     break
             counts = int.from_bytes(bytes_[:-1], byteorder='big', signed=True)
-            return max(counts, 0) * self._multiplier
+            return counts * self._multiplier
 
+        def read(self, *args):
+            self._update(self.read_hw())
+
+
+###############################################################################
+#
+# MCP320X classes and methods - support for 12-bit A/D converters
+#
+###############################################################################
 
 class MCP320X:
     pass
 
 
+###############################################################################
+#
+# MCP482X classes and methods - support for 12-bit D/A converters
+#
+###############################################################################
+
 class MCP482X:
     pass
 
+
+###############################################################################
+#
+# IOMGR classes and methods
+#
+###############################################################################
 
 class IOMGR:
     """
     """
     # Class attributes:
 
-    _PORTS = {'aa': (4, MCP342X),  'ab': (8, MCP342X),
+    _PORTS = {'aa': (8, MCP342X),  'ab': (8, MCP342X),
               'ad': (8, MCP320X),  'ae': (8, MCP320X),
               'da': (8, MCP482X),  'db': (8, MCP482X),
               'ga': (8, MCP230XX), 'gb': (8, MCP230XX),
               'gg': (2, BCM283X),  'gp': (2, BCM283X)}
-    _ports = []
     _queue = Queue()
     _gpio_cleanup = False
     running = False
@@ -862,7 +912,7 @@ class IOMGR:
                     alt_port_name = 'gg' + str(num)
                 else:
                     alt_port_name = None
-                for port in cls._ports:
+                for port in Port.ports:
                     if port.name in (port_name, alt_port_name):
                         break
                 else:
@@ -875,7 +925,12 @@ class IOMGR:
                                    % (err.errno, port_name, err.strerror))
                         cls.queue_message(ERROR, err_msg)
                         continue
-                    cls._ports.append(port)
+                    except Exception as err:
+                        err_msg = ('error on port "%s" %s; startup aborted'
+                                   % (port_name, err))
+                        cls.queue_message(ERROR, err_msg)
+                        continue
+                    Port.ports.append(port)
                     port.start()
                     if port_type in ('gg', 'gp'):
                         cls._gpio_cleanup = True
@@ -883,7 +938,7 @@ class IOMGR:
             err_msg = ('invalid or duplicate port name "%s"; port not started'
                        % port_name)
             cls.queue_message(ERROR, err_msg)
-        if cls._ports:
+        if Port.ports:
             cls.running = True
         else:
             err_msg = 'no port(s) started; %s terminated' % AL.name
@@ -891,7 +946,7 @@ class IOMGR:
 
     @classmethod
     def stop(cls):
-        for port in cls._ports:
+        for port in Port.ports:
             port.stop()
         if cls._gpio_cleanup:
             gpio.cleanup()
@@ -1027,7 +1082,11 @@ class IOMGR:
                       % (channel_name, request_id, argument))
 
 
-# IOMGR main program:
+###############################################################################
+#
+# IOMGR main program
+#
+###############################################################################
 
 if __name__ == '__main__':
     AL.parser.add_argument('port_names', nargs='+',
