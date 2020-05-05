@@ -11,8 +11,8 @@ FUNCTION:  iomgr provides classes and methods to perform input and output
            executed from the command line for testing purposes.  It is
            compatible with Python 2.7.16 and all versions of Python 3.x.
   AUTHOR:  papamac
- VERSION:  1.0.7
-    DATE:  April 27, 2020
+ VERSION:  1.0.8
+    DATE:  May 2, 2020
 
 
 MIT LICENSE:
@@ -86,8 +86,8 @@ DEPENDENCIES/LIMITATIONS:
 
 """
 __author__ = 'papamac'
-__version__ = '1.0.7'
-__date__ = 'April 27, 2020'
+__version__ = '1.0.8'
+__date__ = 'May 2, 2020'
 
 
 from datetime import datetime
@@ -356,15 +356,10 @@ class Channel:
         self.value = None
 
     def _reset(self):
-        warning = 'channel %s reset to default configuration' % self._name
-        IOMGR.queue_message(WARNING, warning)
         for channel_name in self.channels:
             if channel_name not in (self._name, self._alt_name):
                 if self.channels[channel_name] is self:
-                    warning = 'channel %s alias %s deleted' % (self._name,
-                                                               channel_name)
-                    IOMGR.queue_message(WARNING, warning)
-                    del self.channels[channel_name]
+                    self.channels[channel_name] = None
         self.__init()
 
     @staticmethod
@@ -493,7 +488,7 @@ class BCM283X(Port):
             if self._check_direction(INPUT):
                 self._polarity = polarity
 
-        def reset(self):
+        def reset(self, *args):
             self._reset()
             self.pwm(STOP)
             self._init()
@@ -730,7 +725,7 @@ class MCP230XX(Port):
             if self._check_direction(INPUT):
                 self._ipol.update(self.number, polarity)
 
-        def reset(self):
+        def reset(self, *args):
             self._reset()
             self._init()
 
@@ -963,7 +958,7 @@ class IOMGR:
     def queue_message(cls, level, *args):
         message = ' '.join((str(arg) for arg in args))
         LOG.log(level, message)
-        cls._queue.put('%s %s' % (level, message))
+        cls._queue.put('%02i %s' % (level, message))
 
     @classmethod
     def process_request(cls, source, request):

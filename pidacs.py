@@ -11,11 +11,11 @@ FUNCTION:  pidacs is a versatile server program for the PiDACS input/output
            and display iomgr messages/data to the user.
    USAGE:  pidacs is executed from the command line with options specified in
            the argsandlogs module augmented by the code below.  It can also
-           be executed as a daemon by using the old_pidacsd shell script.  It is
-           compatible with Python 2.7.16 and all versions of Python 3.x.
+           be executed as a daemon by using the old_pidacsd shell script.  It
+           is compatible with Python 2.7.16 and all versions of Python 3.x.
   AUTHOR:  papamac
- VERSION:  1.0.6
-    DATE:  April 22, 2020
+ VERSION:  1.0.7
+    DATE:  May 4, 2020
 
 
 MIT LICENSE:
@@ -51,8 +51,8 @@ DEPENDENCIES/LIMITATIONS:
 
 """
 __author__ = 'papamac'
-__version__ = '1.0.6'
-__date__ = 'April 22, 2020'
+__version__ = '1.0.7'
+__date__ = 'May 4, 2020'
 
 
 from os import fork
