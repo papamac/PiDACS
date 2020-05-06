@@ -3,7 +3,7 @@
 #  PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
 #     FILE:  install
 #    TITLE:  Install the PiDACS package
-# FUNCTION:  Install PiDACS files in the current working drectory.
+# FUNCTION:  Install PiDACS files in the current working directory.
 #    USAGE:  Use with papamac's personal package utility (p2pkg).  See below.
 #   AUTHOR:  papamac
 #  VERSION:  1.0.4

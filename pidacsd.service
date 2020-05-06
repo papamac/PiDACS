@@ -7,15 +7,13 @@
 #            server daemon by systemd.
 #    USAGE:  Copied, edited, enabled and started by the option script.
 #   AUTHOR:  papamac
-#  VERSION:  1.0.4
-#     DATE:  May 5, 2020
+#  VERSION:  1.0.5
+#     DATE:  May 6, 2020
 #
 ###############################################################################
 
 [Unit]
 Description=PiDACS server daemon
-# Requires=pigpiod
-# After=poigpiod
 
 [Service]
 Type=forking
