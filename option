@@ -6,8 +6,8 @@
 # FUNCTION:  Install, enable, and start the PiDACS server daemon using systemd.
 #    USAGE:  Use with papamac's personal package utility (p2pkg).  See below.
 #   AUTHOR:  papamac
-#  VERSION:  1.0.7
-#     DATE:  April 22, 2020
+#  VERSION:  1.0.8
+#     DATE:  May 5, 2020
 #
 #
 # MIT LICENSE:
@@ -50,19 +50,19 @@
 # Raspberry Pi that will be accessed by the server daemon.  Port names for
 # currently supported devices are listed in the following table:
 #
-#  Device    |Description                                        |Port Name(s)
-# -----------|---------------------------------------------------|------------
-# BCM2835,6,7|Baseline GPIO set (GPIOs 17-18, 22-25, 27)         |gg0/gp0
-# BCM2835,6,7|Extended GPIO set (GPIOs 5-6, 12-13, 16, 19-21, 26)|gg1/gp1
-# MCP23008   |8-Bit I/O Expander                                 |ga#
-# MCP23017   |16-Bit I/O Expander (A Port)                       |ga#
-# MCP23017   |16-Bit I/O Expander (B Port)                       |gb#
-# MCP3204    |4-Channel 12-Bit A/D Converter                     |ad#
-# MCP3208    |8-Channel 12-Bit A/D Converter                     |ae#
-# MCP3422,3  |2-Channel 18-Bit A/D Converter                     |aa#
-# MCP3424    |4-Channel 18-Bit A/D Converter                     |ab#
-# MCP4821    |1-Channel 12-Bit D/A Converter                     |da#
-# MCP4822    |2-Channel 12-Bit D/A Converter                     |db#
+#  Device     |               Description                          | Port Name
+# ------------|----------------------------------------------------|-----------
+# BCM2835,6,7 |Baseline GPIO set (GPIOs 17-18, 22-25, 27)          |   gp0
+# BCM2835,6,7 |Extended GPIO set (GPIOs 5-6, 12-13, 16, 19-21, 26) |   gp1
+# MCP23008    |8-Bit I/O Expander                                  |   ga#
+# MCP23017    |16-Bit I/O Expander (A Port)                        |   ga#
+# MCP23017    |16-Bit I/O Expander (B Port)                        |   gb#
+# MCP3204     |4-Channel 12-Bit A/D Converter                      |   ad#
+# MCP3208     |8-Channel 12-Bit A/D Converter                      |   ae#
+# MCP3422,3   |2-Channel 18-Bit A/D Converter                      |   aa#
+# MCP3424     |4-Channel 18-Bit A/D Converter                      |   ab#
+# MCP4821     |1-Channel 12-Bit D/A Converter                      |   da#
+# MCP4822     |2-Channel 12-Bit D/A Converter                      |   db#
 #
 # Before starting, option checks to see if the PiDACS package has been
 # installed.  If not, it aborts the option execution.  If so, option copies
@@ -131,7 +131,7 @@ fi
 
 if [[ $args ]]; then
     infomsg "$g${t}option:$n setting I/O port names to $m$t$args$n"
-    sed -i "s|gg0 gg1|$args|" $systemd/$daemon_unit
+    sed -i "s|gp0 gp1|$args|" $systemd/$daemon_unit
 fi
 
 # Enable the daemon unit and restart the daemon.

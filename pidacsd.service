@@ -7,8 +7,8 @@
 #            server daemon by systemd.
 #    USAGE:  Copied, edited, enabled and started by the option script.
 #   AUTHOR:  papamac
-#  VERSION:  1.0.3
-#     DATE:  April 22, 2020
+#  VERSION:  1.0.4
+#     DATE:  May 5, 2020
 #
 ###############################################################################
 
@@ -20,7 +20,7 @@ Description=PiDACS server daemon
 [Service]
 Type=forking
 PIDFile=/run/pidacsd.pid
-ExecStart=/usr/local/bin/pidacs -d -l DATA gg0 gg1
+ExecStart=/usr/local/bin/pidacs -d -l DATA gp0 gp1
 
 [Install]
 Alias=/usr/local/lib/systemd/system/pidacs.service

@@ -11,8 +11,8 @@ FUNCTION:  iomgr provides classes and methods to perform input and output
            executed from the command line for testing purposes.  It is
            compatible with Python 2.7.16 and all versions of Python 3.x.
   AUTHOR:  papamac
- VERSION:  1.0.8
-    DATE:  May 2, 2020
+ VERSION:  1.1.0
+    DATE:  May 6, 2020
 
 
 MIT LICENSE:
@@ -50,12 +50,12 @@ follows:
 
 -------------------------------------------------------------------------------
 |  Device   |         Description             | Max No  |   Port   | Channels |
-|   Name    |                                 | Devices |  Types   | per Port |
+|   Name    |                                 | Devices |   Type   | per Port |
 |-----------|---------------------------------|---------|----------|----------|
-|BCM2835,6,7| Raspberry Pi Baseline GPIO      |    1    | gg0, gp0 |    7     |
+|BCM2835,6,7| Raspberry Pi Baseline GPIO      |    1    |    gp0   |    7     |
 |           | GPIOs 17-18, 22-25, 27          |         |          |          |
 |-----------|---------------------------------|---------|----------|----------|
-|BCM2835,6,7| Raspberry Pi Extended GPIO      |    1    | gg1, gp1 |    9     |
+|BCM2835,6,7| Raspberry Pi Extended GPIO      |    1    |    gp1   |    9     |
 |           | GPIOs 5-6, 12-13, 16, 19-21, 26 |         |          |          |
 |-----------|---------------------------------|---------|----------|----------|
 | MCP23008  | 8-Bit I/O Expander              |    8    |    ga    |    8     |
@@ -86,8 +86,8 @@ DEPENDENCIES/LIMITATIONS:
 
 """
 __author__ = 'papamac'
-__version__ = '1.0.8'
-__date__ = 'May 2, 2020'
+__version__ = '1.1.0'
+__date__ = 'May 6, 2020'
 
 
 from datetime import datetime
@@ -339,10 +339,9 @@ class Channel:
 
     # Private methods:
 
-    def __init__(self, port, name, alt_name=None):
+    def __init__(self, port, name):
         self.port = port
         self._name = name
-        self._alt_name = alt_name
         self.id = self.change_ = self.interval_ = None
         self.prior_report = self.prior_value = self.value = None
         self.__init()
@@ -357,7 +356,7 @@ class Channel:
 
     def _reset(self):
         for channel_name in self.channels:
-            if channel_name not in (self._name, self._alt_name):
+            if channel_name != self._name:
                 if self.channels[channel_name] is self:
                     self.channels[channel_name] = None
         self.__init()
@@ -405,41 +404,30 @@ class Channel:
 class BCM283X(Port):
     """
     """
-    _CHANNELS = [{17: 11, 18: 12, 22: 15, 23: 16, 24: 18, 25: 22, 27: 13},
-                 {5:  29,  6: 31, 12: 32, 13: 33, 16: 36, 19: 35, 20: 38,
-                  21: 40, 26: 37}]
+    _CHANNEL_NAMES = [['gp17', 'gp18', 'gp22', 'gp23', 'gp24', 'gp25', 'gp27'],
+                      ['gp05', 'gp06', 'gp12', 'gp13', 'gp16', 'gp19', 'gp20',
+                       'gp21', 'gp26']]
 
     def __init__(self, name):
         Port.__init__(self, name)
-
-        bcm_type = name[:2]  # bcm_type is gg or gp.
-        mode = gpio.BCM if bcm_type == 'gg' else gpio.BOARD
-        gpio.setmode(mode)
+        gpio.setmode(gpio.BCM)
         gpio.setwarnings(False)
 
-        # Instantiate channels using both gpio number names and pin number
-        # names.
+        # Instantiate channels.
 
         channel_set = int(name[2])  # channel set is 0 or 1.
-        for gpio_number in self._CHANNELS[channel_set]:
-            pin_number = self._CHANNELS[channel_set][gpio_number]
-            gpio_name = 'gg%02i' % gpio_number
-            pin_name = 'gp%02i' % pin_number
-            if bcm_type == 'gg':
-                channel = self._Channel(self, gpio_name, pin_name)
-            else:
-                channel = self._Channel(self, pin_name, gpio_name)
+        for channel_name in self._CHANNEL_NAMES[channel_set]:
+            channel = self._Channel(self, channel_name)
             self._channels.append(channel)
-            Channel.channels[gpio_name] = channel
-            Channel.channels[pin_name] = channel
+            Channel.channels[channel_name] = channel
 
     class _Channel(Channel):
         """
         """
         # Private methods:
 
-        def __init__(self, port, name, alt_name):
-            Channel.__init__(self, port, name, alt_name)
+        def __init__(self, port, name):
+            Channel.__init__(self, port, name)
             self._number = int(name[2:])
             self._direction = self._pullup = self._polarity = None
             self._dutycycle = self._frequency = self._pwm = None
@@ -885,7 +873,7 @@ class IOMGR:
               'ad': (8, MCP320X),  'ae': (8, MCP320X),
               'da': (8, MCP482X),  'db': (8, MCP482X),
               'ga': (8, MCP230XX), 'gb': (8, MCP230XX),
-              'gg': (2, BCM283X),  'gp': (2, BCM283X)}
+              'gp': (2, BCM283X)}
     _queue = Queue()
     _gpio_cleanup = False
     running = False
@@ -902,34 +890,29 @@ class IOMGR:
                 port_type = port_name[:2]
                 num = int(port_name[2])
                 if port_type in cls._PORTS and num < cls._PORTS[port_type][0]:
-                    alt_port_name = 'gp' + str(num)
-                elif port_type == 'gp':
-                    alt_port_name = 'gg' + str(num)
-                else:
-                    alt_port_name = None
-                for port in Port.ports:
-                    if port.name in (port_name, alt_port_name):
-                        break
-                else:
-                    info = 'starting port "%s"' % port_name
-                    cls.queue_message(INFO, info)
-                    try:
-                        port = cls._PORTS[port_type][1](port_name)
-                    except OSError as err:
-                        err_msg = ('error %s on port "%s" %s; startup aborted'
-                                   % (err.errno, port_name, err.strerror))
-                        cls.queue_message(ERROR, err_msg)
+                    for port in Port.ports:
+                        if port.name == port_name:
+                            break
+                    else:
+                        info = 'starting port "%s"' % port_name
+                        cls.queue_message(INFO, info)
+                        try:
+                            port = cls._PORTS[port_type][1](port_name)
+                        except OSError as err:
+                            err_msg = ('error %s on port "%s" %s; '
+                                       'startup aborted'
+                                       % (err.errno, port_name, err.strerror))
+                            cls.queue_message(ERROR, err_msg)
+                            continue
+                        except Exception as err:
+                            err_msg = ('error on port "%s" %s; startup aborted'
+                                       % (port_name, err))
+                            cls.queue_message(ERROR, err_msg)
+                            continue
+                        Port.ports.append(port)
+                        port.start()
+                        cls._gpio_cleanup = port_type == 'gp'
                         continue
-                    except Exception as err:
-                        err_msg = ('error on port "%s" %s; startup aborted'
-                                   % (port_name, err))
-                        cls.queue_message(ERROR, err_msg)
-                        continue
-                    Port.ports.append(port)
-                    port.start()
-                    if port_type in ('gg', 'gp'):
-                        cls._gpio_cleanup = True
-                    continue
             err_msg = ('invalid or duplicate port name "%s"; port not started'
                        % port_name)
             cls.queue_message(ERROR, err_msg)
