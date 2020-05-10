@@ -6,8 +6,8 @@
 # FUNCTION:  Install PiDACS files in the current working directory.
 #    USAGE:  Use with papamac's personal package utility (p2pkg).  See below.
 #   AUTHOR:  papamac
-#  VERSION:  1.0.4
-#     DATE:  April 22, 2020
+#  VERSION:  1.0.5
+#     DATE:  May 10, 2020
 #
 #
 # MIT LICENSE:
@@ -67,7 +67,7 @@
 # Ensure that the papamaclib package has been downloaded.
 
 if [[ ! -d $src/papamaclib ]]; then
-    errmsg "install: papamaclib not downloaded; $m$t$pkg_name$n install aborted"
+    errmsg "install: papamaclib not downloaded; $pkg_name install aborted"
     echo_exit 1
 fi
 
