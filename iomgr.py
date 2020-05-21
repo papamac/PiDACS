@@ -11,8 +11,8 @@ FUNCTION:  iomgr provides classes and methods to perform input and output
            executed from the command line for testing purposes.  It is
            compatible with Python 2.7.16 and all versions of Python 3.x.
   AUTHOR:  papamac
- VERSION:  1.1.0
-    DATE:  May 6, 2020
+ VERSION:  1.1.1
+    DATE:  May 21, 2020
 
 
 MIT LICENSE:
@@ -85,10 +85,10 @@ DEPENDENCIES/LIMITATIONS:
 ****************************** needs work *************************************
 
 """
-__author__ = 'papamac'
-__version__ = '1.1.0'
-__date__ = 'May 6, 2020'
 
+__author__ = 'papamac'
+__version__ = '1.1.1'
+__date__ = 'May 21, 2020'
 
 from datetime import datetime
 from logging import DEBUG, INFO, WARNING, ERROR
@@ -244,28 +244,31 @@ SPECIAL_SHORTCUTS = {'d': 'direction', 'r': 'read', 'res': 'resolution'}
 
 class Port(Thread):
     """
+    **************************** needs work ***********************************
     """
     ports = []
 
     # Private methods:
 
     def __init__(self, name):
+        LOG.threaddebug('Port.__init__ called "%s%', name)
         Thread.__init__(self, name=name)
+        LOG.threaddebug('Port.__init__ called')
         self._channels = []    # All Channel objects for this Port instance.
         self._queue = Queue()  # Request queue for this Port instance.
         self._running = False
 
     def _poll(self, dt_now):
+        # LOG.threaddebug('Port._poll called "%s%', self.name)
         for channel in self._channels:
             if channel.change_ or channel.interval_:
                 try:
                     value = channel.read_hw()
                 except OSError as err:
                     self._running = False
-                    err_msg = ('polling read error %s on channel "%s" %s; '
-                               'port "%s" stopped'
-                               % (err.errno, channel.id,
-                                  err.strerror, self.name))
+                    err_msg = ('Port._poll: read error %s on channel "%s" %s; '
+                               'port "%s" stopped' % (err.errno, channel.id,
+                                                      err.strerror, self.name))
                     IOMGR.queue_message(ERROR, err_msg)
                     IOMGR.queue_message(DATA, '%s !ERROR' % channel.id)
                     value = '!ERROR'
@@ -279,11 +282,13 @@ class Port(Thread):
                     channel.prior_report = dt_now
 
     def _value_changed(self, channel):
+        LOG.threaddebug('Port._value_changed called "%s"', channel)
         return channel.value != channel.prior_value
 
 # Public methods:
 
     def run(self):
+        LOG.threaddebug('Port.run called "%s%', self.name)
         self._running = True
         poll_count = 0
         dt_status = datetime.now()
@@ -302,10 +307,10 @@ class Port(Thread):
                 channel_name, channel, request_id, method, argument = request
                 try:
                     method(argument)
-                    LOG.debug('executed [%s %s %s]'
-                              % (channel_name, request_id, argument))
+                    LOG.debug('Port.run: executed [%s %s %s]', channel_name,
+                              request_id, argument)
                 except Exception as err:
-                    err_msg = ('execution error [%s %s %s] %s'
+                    err_msg = ('Port.run: execution error [%s %s %s] %s'
                                % (channel_name, request_id, argument, err))
                     IOMGR.queue_message(ERROR, err_msg)
                     IOMGR.queue_message(DATA, '%s !ERROR' % channel.id)
@@ -318,28 +323,32 @@ class Port(Thread):
             status_int = (dt_now - dt_status).total_seconds()
             if status_int >= STATUS_INTERVAL:
                 rate = poll_count / status_int
-                IOMGR.queue_message(DEBUG, 'polling "%s" %d per sec'
+                IOMGR.queue_message(DEBUG, 'Port.run: polling "%s" %d per sec'
                                            % (self.name, rate))
                 poll_count = 0
                 dt_status = dt_now
 
     def stop(self):
+        LOG.threaddebug('Port.stop called "%s%', self.name)
         if self._running:
             self._running = False
             self.join()
 
     def queue_request(self, *args):
+        LOG.threaddebug('Port.queue_request called "%s%', self.name)
         self._queue.put(args)
 
 
 class Channel:
     """
+    **************************** needs work ***********************************
     """
     channels = {}
 
     # Private methods:
 
     def __init__(self, port, name):
+        LOG.threaddebug('Channel.__init__ called "%s%', name)
         self.port = port
         self._name = name
         self.id = self.change_ = self.interval_ = None
@@ -347,6 +356,7 @@ class Channel:
         self.__init()
 
     def __init(self):
+        LOG.threaddebug('Channel.__init called "%s%', self._name)
         self.id = self._name
         self.change_ = CHANGE
         self.interval_ = INTERVAL
@@ -355,6 +365,7 @@ class Channel:
         self.value = None
 
     def _reset(self):
+        LOG.threaddebug('Channel._reset called "%s%', self.id)
         for channel_name in self.channels:
             if channel_name != self._name:
                 if self.channels[channel_name] is self:
@@ -363,21 +374,26 @@ class Channel:
 
     @staticmethod
     def _check_bitval(bitval):
+        LOG.threaddebug('Channel._check_bitval called')
         ok = bitval in (0, 1)
         if not ok:
-            warning = 'invalid bit value "%s"; request ignored' % bitval
+            warning = ('Channel._check_bitval: invalid bit value "%s"; '
+                       'request ignored' % bitval)
             IOMGR.queue_message(WARNING, warning)
         return ok
 
     def _check_direction(self, direction):
+        LOG.threaddebug('Channel._check_direction called "%s%', self.id)
         ok = self._direction is direction
         if not ok:
-            warning = ('channel "%s" not configured for %s; request ignored'
-                       % (self.id, ('output', 'input')[direction]))
+            dir_txt = ('output', 'input')[direction]
+            warning = ('Channel._check_direction: channel "%s" not configured '
+                       'for %s; request ignored' % (self.id, dir_txt))
             IOMGR.queue_message(WARNING, warning)
         return ok
 
     def _update(self, value):
+        LOG.threaddebug('Channel._update called "%s%', self.id)
         self.prior_value = self.value
         self.value = value
         IOMGR.queue_message(DATA, self.id, value)
@@ -385,13 +401,16 @@ class Channel:
     # Public methods:
 
     def alias(self, alias):
+        LOG.threaddebug('Channel.alias called "%s%', self.id)
         self.id = '%s[%s]' % (alias, self._name)
         self.channels[alias] = self
 
     def change(self, change):
+        LOG.threaddebug('Channel.change called "%s%', self.id)
         self.change_ = change
 
     def interval(self, interval):
+        LOG.threaddebug('Channel.interval called "%s%', self.id)
         self.interval_ = interval
 
 
@@ -403,13 +422,16 @@ class Channel:
 
 class BCM283X(Port):
     """
+    **************************** needs work ***********************************
     """
     _CHANNEL_NAMES = [['gp17', 'gp18', 'gp22', 'gp23', 'gp24', 'gp25', 'gp27'],
                       ['gp05', 'gp06', 'gp12', 'gp13', 'gp16', 'gp19', 'gp20',
                        'gp21', 'gp26']]
 
     def __init__(self, name):
+        LOG.threaddebug('BCM283X.__init__ called "%s%', name)
         Port.__init__(self, name)
+
         gpio.setmode(gpio.BCM)
         gpio.setwarnings(False)
 
@@ -423,11 +445,14 @@ class BCM283X(Port):
 
     class _Channel(Channel):
         """
+        ************************** needs work *********************************
         """
         # Private methods:
 
         def __init__(self, port, name):
+            LOG.threaddebug('BCM283X._Channel.__init__ called "%s%', name)
             Channel.__init__(self, port, name)
+
             self._number = int(name[2:])
             self._direction = self._pullup = self._polarity = None
             self._dutycycle = self._frequency = self._pwm = None
@@ -435,6 +460,7 @@ class BCM283X(Port):
             self._init()
 
         def _init(self):
+            LOG.threaddebug('BCM283X._Channel._init called "%s%', self.id)
             self._pullup = PULLUP
             self._polarity = POLARITY
             self._dutycycle = DUTYCYCLE
@@ -447,6 +473,7 @@ class BCM283X(Port):
             self.read()
 
         def _configure(self, direction, pullup):
+            LOG.threaddebug('BCM283X._Channel._configure called "%s%', self.id)
             gppu = (gpio.PUD_OFF if pullup is OFF
                     else gpio.PUD_UP if pullup is UP
                     else gpio.PUD_DOWN)
@@ -455,28 +482,35 @@ class BCM283X(Port):
             self._pullup = pullup
 
         def _apply_polarity(self, bitval):
+            LOG.threaddebug('BCM283X._Channel._apply_polarity called "%s%',
+                            self.id)
             if self._polarity:
                 bitval = 0 if bitval else 1
             return bitval
 
         def _write_hw(self, bitval):
+            LOG.threaddebug('BCM283X._Channel._write_hw called "%s%', self.id)
             gpio.output(self._number, bitval)
 
         # Public configuration methods: direction, pullup, polarity, reset
 
         def direction(self, direction):
+            LOG.threaddebug('BCM283X._Channel.direction called "%s%', self.id)
             pullup = self._pullup if direction is INPUT else OFF
             self._configure(direction, pullup)
 
         def pullup(self, pullup):
+            LOG.threaddebug('BCM283X._Channel.pullup called "%s%', self.id)
             if self._check_direction(INPUT):
                 self._configure(self._direction, pullup)
 
         def polarity(self, polarity):
+            LOG.threaddebug('BCM283X._Channel.polarity called "%s%', self.id)
             if self._check_direction(INPUT):
                 self._polarity = polarity
 
         def reset(self, *args):
+            LOG.threaddebug('BCM283X._Channel._init called "%s%', self.id)
             self._reset()
             self.pwm(STOP)
             self._init()
@@ -484,18 +518,21 @@ class BCM283X(Port):
         # Public pwm methods: dutycycle, frequency, pwm
 
         def dutycycle(self, dutycycle):
+            LOG.threaddebug('BCM283X._Channel.dutycycle called "%s%', self.id)
             if self._check_direction(OUTPUT):
                 self._dutycycle = dutycycle
                 if self._pwm:
                     self._pwm.ChangeDutyCycle(self._dutycycle)
 
         def frequency(self, frequency):
+            LOG.threaddebug('BCM283X._Channel.frequency called "%s%', self.id)
             if self._check_direction(OUTPUT):
                 self._frequency = frequency
                 if self._pwm:
                     self._pwm.ChangeFrequency(self._frequency)
 
         def pwm(self, operation):
+            LOG.threaddebug('BCM283X._Channel.pwm called "%s%', self.id)
             if self._check_direction(OUTPUT):
                 if operation is START:
                     if self._pwm:  # Stop/delete existing pwm, if active.
@@ -517,13 +554,16 @@ class BCM283X(Port):
         # Public digital I/O methods: read_hw, read, write, momentary
 
         def read_hw(self):
+            # LOG.threaddebug('BCM283X._Channel.read_hw called "%s%', self.id)
             return self._apply_polarity(gpio.input(self._number))
 
         def read(self, *args):
+            LOG.threaddebug('BCM283X._Channel.read called "%s%', self.id)
             value = self.read_hw()
             self._update(value)
 
         def write(self, bitval):
+            LOG.threaddebug('BCM283X._Channel.write called "%s%', self.id)
             if self._check_direction(OUTPUT):
                 if self._check_bitval(bitval):
                     if self._pwm:  # Stop/delete existing pwm, if active.
@@ -536,6 +576,7 @@ class BCM283X(Port):
                     self._update(bitval)
 
         def momentary(self, delay):
+            LOG.threaddebug('BCM283X._Channel.momentary called "%s%', self.id)
             if self._check_direction(OUTPUT):
                 self._write_hw(ON)
                 self._update(ON)
@@ -552,12 +593,13 @@ class BCM283X(Port):
 
 class MCP230XX(Port):
     """
+    **************************** needs work ***********************************
     """
+
     _I2C_BASE_ADDRESS = 0x20
-    _REGISTER_BASE_ADDRESSES = {'IODIR': 0x00, 'IPOL': 0x01,
-                                'GPPU':  0x06, 'GPIO': 0x09}
 
     def __init__(self, name):
+        LOG.threaddebug('MCP230XX.__init__ called "%s%', name)
         Port.__init__(self, name)
 
         self.registers = {}
@@ -572,19 +614,22 @@ class MCP230XX(Port):
         # sequential operation.  See the MCP23017 Data Sheet page 18 for
         # details.
 
-        iocon = self._Register(i2c_address, 0x05)
+        iocon = self._Register('IOCON', i2c_address, 0x05)
         if iocon.value != 0xA2:
-            iocon = self._Register(i2c_address, 0x0A)
+            iocon = self._Register('IOCON', i2c_address, 0x0A)
             iocon.write(0xA2)
 
         # Instantiate registers.
 
         port_offset = 0x10 if mcp_type == 'gb' else 0
-        for reg_name in self._REGISTER_BASE_ADDRESSES:
-            reg_address = self._REGISTER_BASE_ADDRESSES[reg_name] + port_offset
-            self.registers[reg_name] = self._Register(i2c_address, reg_address)
-
-        self._gpio = self.registers['GPIO']
+        self.iodir = self._Register(name + ':IODIR', i2c_address,
+                                    0x00 + port_offset)
+        self.ipol = self._Register(name + ':IPOL', i2c_address,
+                                   0x01 + port_offset)
+        self.gppu = self._Register(name + ':GPPU', i2c_address,
+                                   0x06 + port_offset)
+        self.gpio = self._Register(name + ':GPIO', i2c_address,
+                                   0x09 + port_offset)
 
         # Instantiate channels.
 
@@ -595,25 +640,27 @@ class MCP230XX(Port):
             Channel.channels[channel_name] = channel
 
     def _poll(self, dt_now):  # Replaces superclass method.
+        # LOG.threaddebug('MCP230XX._poll called "%s%', self.name)
         for channel in self._channels:
             if channel.change_ or channel.interval_:
                 break
             return  # Return if no I/O required.
         good_gpio_read = True
         try:
-            self._gpio.read()
-            changes = self._gpio.value ^ self._gpio.prior_value
+            self.gpio.read()
+            changes = self.gpio.value ^ self.gpio.prior_value
         except OSError as err:
             self._running = False
             good_gpio_read = False
-            err_msg = ('polling read error %s on port "%s" %s; port stopped'
-                       % (err.errno, self.name, err.strerror))
+            err_msg = ('MCP230XX._poll: polling read error %s on port '
+                       '"%s" %s; port stopped' % (err.errno, self.name,
+                                                  err.strerror))
             IOMGR.queue_message(ERROR, err_msg)
             changes = 0xff
         for channel in self._channels:
             mask = 1 << channel.number
             if good_gpio_read:  # gpio register read was good.
-                bitval = 1 if self._gpio.value & mask else 0
+                bitval = 1 if self.gpio.value & mask else 0
             else:  # gpio register read error.
                 bitval = '!ERROR'
                 IOMGR.queue_message(DATA, '%s !ERROR' % channel.id)
@@ -628,28 +675,36 @@ class MCP230XX(Port):
 
     class _Register:
         """
+        ************************** needs work *********************************
         """
-        def __init__(self, i2c_address, reg_address):
+
+        def __init__(self, name, i2c_address, reg_address):
+            LOG.threaddebug('MCP230XX._Register.__init__ called "%s%', name)
             self.prior_value = 0
             self.value = 0
 
+            self._name = name
             self._i2c_address = i2c_address
             self._reg_address = reg_address
 
             self.read()
 
         def read(self):
+            LOG.threaddebug('MCP230XX._Register.read called "%s%', self._name)
             self.prior_value = self.value
             self.value = i2cbus.read_byte_data(self._i2c_address,
                                                self._reg_address)
             return self.value
 
         def write(self, value):
+            LOG.threaddebug('MCP230XX._Register.write called "%s%', self._name)
             i2cbus.write_byte_data(self._i2c_address, self._reg_address, value)
             self.prior_value = self.value
             self.value = value
 
         def update(self, channel_number, bitval):
+            LOG.threaddebug('MCP230XX._Register.update called "%s%',
+                            self._name)
             mask = 1 << channel_number
             value = self.value | mask if bitval else self.value & ~mask
             self.write(value)
@@ -676,64 +731,75 @@ class MCP230XX(Port):
         value and prior_value attributes, queued to IOMGR._queue, and logged.
         MCP230XX._Channel methods accomplish their functions using
         MCP230XX._Register methods to read/write lower-level registers.
+
+        ************************** needs work *********************************
         """
+
         # Private methods:
 
         def __init__(self, port, name):
+            LOG.threaddebug('MCP230XX._Channel.__init__ called "%s%', name)
             Channel.__init__(self, port, name)
             self.number = int(name[3])
+            self._port = port
             self._direction = None
-            self._iodir = port.registers['IODIR']
-            self._ipol = port.registers['IPOL']
-            self._gppu = port.registers['GPPU']
-            self._gpio = port.registers['GPIO']
             self._init()
 
         def _init(self):
+            LOG.threaddebug('MCP230XX._Channel._init called "%s%', self.id)
             self.direction(DIRECTION)
             self.polarity(POLARITY)
             self.pullup(PULLUP)
             self.read()
 
         def _write_hw(self, bitval):
-            self._gpio.update(self.number, bitval)
+            LOG.threaddebug('MCP230XX._Channel._write_hw called "%s%', self.id)
+            self._port.gpio.update(self.number, bitval)
 
         # Public configuration methods: direction, pullup, polarity, reset
 
         def direction(self, direction):
-            self._iodir.update(self.number, direction)
+            LOG.threaddebug('MCP230XX._Channel.direction called "%s%', self.id)
+            self._port.iodir.update(self.number, direction)
             self._direction = direction
 
         def pullup(self, pullup):
+            LOG.threaddebug('MCP230XX._Channel.pullup called "%s%', self.id)
             if self._check_direction(INPUT):
                 if self._check_bitval(pullup):
-                    self._gppu.update(self.number, pullup)
+                    self._port.gppu.update(self.number, pullup)
 
         def polarity(self, polarity):
+            LOG.threaddebug('MCP230XX._Channel.polarity called "%s%', self.id)
             if self._check_direction(INPUT):
-                self._ipol.update(self.number, polarity)
+                self._port.ipol.update(self.number, polarity)
 
         def reset(self, *args):
+            LOG.threaddebug('MCP230XX._Channel.reset called "%s%', self.id)
             self._reset()
             self._init()
 
         # Public digital I/O methods: read_hw, read, write, momentary
 
         def read_hw(self):
-            bitval = 1 if self._gpio.read() & (1 << self.number) else 0
+            # LOG.threaddebug('MCP230XX._Channel.read_hw called "%s%', self.id)
+            bitval = 1 if self._port.gpio.read() & (1 << self.number) else 0
             return bitval
 
         def read(self, *args):
+            LOG.threaddebug('MCP230XX._Channel.read called "%s%', self.id)
             value = self.read_hw()
             self._update(value)
 
         def write(self, bitval):
+            LOG.threaddebug('MCP230XX._Channel.write called "%s%', self.id)
             if self._check_direction(OUTPUT):
                 if self._check_bitval(bitval):
                     self._write_hw(bitval)
                     self._update(bitval)
 
         def momentary(self, delay):
+            LOG.threaddebug('MCP230XX._Channel.momentary called "%s%', self.id)
             if self._check_direction(OUTPUT):
                 self._write_hw(ON)
                 self._update(ON)
@@ -749,8 +815,12 @@ class MCP230XX(Port):
 ###############################################################################
 
 class MCP342X(Port):
+    """
+    **************************** needs work ***********************************
+    """
 
     def __init__(self, name):
+        LOG.threaddebug('MCP342X.__init__ called "%s%', name)
         Port.__init__(self, name)
 
         mcp_type = name[:2]
@@ -762,6 +832,7 @@ class MCP342X(Port):
             Channel.channels[channel_name] = channel
 
     def _value_changed(self, channel):  # Replaces superclass method.
+        # LOG.threaddebug('MCP342X._value_changed called "%s%', channel)
         pval = channel.prior_value
         val = channel.value
         if val == '!ERROR':
@@ -774,12 +845,15 @@ class MCP342X(Port):
 
     class _Channel(Channel):
         """
+        ************************** needs work *********************************
         """
+
         _I2C_BASE_ADDRESS = 0x68
 
         # Private methods:
 
         def __init__(self, port, name):
+            LOG.threaddebug('MCP342X._Channel.__init__ called "%s%', name)
             Channel.__init__(self, port, name)
             self._i2c_address = self._I2C_BASE_ADDRESS + int(name[2])
             self._number = int(name[3])
@@ -788,6 +862,7 @@ class MCP342X(Port):
             self._init()
 
         def _init(self):
+            LOG.threaddebug('MCP342X._Channel._init called "%s%', self.id)
             self._gain = GAIN
             self._resolution = RESOLUTION
             self._scaling = SCALING
@@ -795,6 +870,7 @@ class MCP342X(Port):
             self.read()
 
         def _configure(self):
+            LOG.threaddebug('MCP342X._Channel._configure called "%s%', self.id)
             resolution_index = int((self._resolution - 12) / 2)
             gain_index = int(log2(self._gain))
             self._config = (0x80 + 32 * self._number + 4 * resolution_index
@@ -806,24 +882,29 @@ class MCP342X(Port):
         # Public configuration methods: gain, resolution, scaling, reset
 
         def gain(self, gain):
+            LOG.threaddebug('MCP342X._Channel.gain called "%s%', self.id)
             self._gain = gain
             self._configure()
 
         def resolution(self, resolution):
+            LOG.threaddebug('MCP342X._Channel.resolution called "%s%', self.id)
             self._resolution = resolution
             self._configure()
 
         def scaling(self, scaling):
+            LOG.threaddebug('MCP342X._Channel.scaling called "%s%', self.id)
             self._scaling = scaling
             self._configure()
 
         def reset(self, *args):
+            LOG.threaddebug('MCP342X._Channel.reset called "%s%', self.id)
             self._reset()
             self._init()
 
         # Public analog input methods: read_hw, read
 
         def read_hw(self):
+            # LOG.threaddebug('MCP342X._Channel.read_hw called "%s%', self.id)
             i2cbus.write_byte(self._i2c_address, self._config)
             config = self._config & 0x7F
             while True:
@@ -835,6 +916,7 @@ class MCP342X(Port):
             return counts * self._multiplier
 
         def read(self, *args):
+            LOG.threaddebug('MCP342X._Channel.read called "%s%', self.id)
             self._update(self.read_hw())
 
 
@@ -844,8 +926,14 @@ class MCP342X(Port):
 #
 ###############################################################################
 
-class MCP320X:
-    pass
+class MCP320X(Port):
+    """
+    **************************** needs work ***********************************
+    """
+
+    def __init__(self, name):
+        LOG.threaddebug('MCP320X.__init__ called "%s%', name)
+        Port.__init__(self, name)
 
 
 ###############################################################################
@@ -854,19 +942,27 @@ class MCP320X:
 #
 ###############################################################################
 
-class MCP482X:
-    pass
+class MCP482X(Port):
+    """
+    **************************** needs work ***********************************
+    """
+
+    def __init__(self, name):
+        LOG.threaddebug('MCP482X.__init__ called "%s%', name)
+        Port.__init__(self, name)
 
 
 ###############################################################################
 #
-# IOMGR classes and methods
+# IOMGR class and methods
 #
 ###############################################################################
 
 class IOMGR:
     """
+    **************************** needs work ***********************************
     """
+
     # Class attributes:
 
     _PORTS = {'aa': (8, MCP342X),  'ab': (8, MCP342X),
@@ -880,9 +976,10 @@ class IOMGR:
 
     @classmethod
     def start(cls):
-        """
-        Start IOMGR ports.
-        """
+        """ Start IOMGR ports. """
+
+        LOG.threaddebug('IOMGR.start called')
+
         # Check port names and instantiate/start valid ports.
 
         for port_name in AL.args.port_names:
@@ -899,31 +996,33 @@ class IOMGR:
                         try:
                             port = cls._PORTS[port_type][1](port_name)
                         except OSError as err:
-                            err_msg = ('error %s on port "%s" %s; '
-                                       'startup aborted'
+                            err_msg = ('IOMGR.start: error %s on port '
+                                       '"%s" %s; startup aborted'
                                        % (err.errno, port_name, err.strerror))
                             cls.queue_message(ERROR, err_msg)
                             continue
                         except Exception as err:
-                            err_msg = ('error on port "%s" %s; startup aborted'
-                                       % (port_name, err))
+                            err_msg = ('IOMGR.start: error on port "%s" %s; '
+                                       'startup aborted' % (port_name, err))
                             cls.queue_message(ERROR, err_msg)
                             continue
                         Port.ports.append(port)
                         port.start()
                         cls._gpio_cleanup = port_type == 'gp'
                         continue
-            err_msg = ('invalid or duplicate port name "%s"; port not started'
-                       % port_name)
+            err_msg = ('IOMGR.start: invalid or duplicate port name "%s"; '
+                       'port not started' % port_name)
             cls.queue_message(ERROR, err_msg)
         if Port.ports:
             cls.running = True
         else:
-            err_msg = 'no port(s) started; %s terminated' % AL.name
+            err_msg = ('IOMGR.start: no port(s) started; %s terminated'
+                       % AL.name)
             cls.queue_message(ERROR, err_msg)
 
     @classmethod
     def stop(cls):
+        LOG.threaddebug('IOMGR.stop called')
         for port in Port.ports:
             port.stop()
         if cls._gpio_cleanup:
@@ -931,6 +1030,7 @@ class IOMGR:
 
     @classmethod
     def get_message(cls):
+        LOG.threaddebug('IOMGR.get_message called')
         try:
             message = cls._queue.get(timeout=1)
         except Empty:
@@ -939,13 +1039,15 @@ class IOMGR:
 
     @classmethod
     def queue_message(cls, level, *args):
+        LOG.threaddebug('IOMGR.queue_message called')
         message = ' '.join((str(arg) for arg in args))
         LOG.log(level, message)
         cls._queue.put('%02i %s' % (level, message))
 
     @classmethod
     def process_request(cls, source, request):
-        LOG.debug('received "%s" [%s]' % (source, request))
+        LOG.threaddebug('IOMGR.process_request called')
+        LOG.debug('IOMGR.process_request: received "%s" [%s]', source, request)
 
         # An IOMGR request 2 or 3 fields with the following form:
 
@@ -966,7 +1068,7 @@ class IOMGR:
         # Check for 2 or 3 fields.  Declare a syntax error and return if other.
 
         if nsplit not in (2, 3):
-            warning = 'invalid syntax; request ignored'
+            warning = 'IOMGR.process_request: invalid syntax; request ignored'
             cls.queue_message(WARNING, warning)
             return
 
@@ -976,7 +1078,8 @@ class IOMGR:
         channel_name = rsplit[0]
         channel = Channel.channels.get(channel_name)
         if channel is None:
-            warning = 'channel "%s" not found; request ignored' % channel_name
+            warning = ('IOMGR.process_request: channel "%s" not found; '
+                       'request ignored' % channel_name)
             cls.queue_message(WARNING, warning)
             return
 
@@ -997,7 +1100,8 @@ class IOMGR:
                 if method is not None:
                     break
         else:
-            warning = 'invalid request id "%s"; request ignored' % request_id
+            warning = ('IOMGR.process_request: invalid request id "%s"; '
+                       'request ignored' % request_id)
             cls.queue_message(WARNING, warning)
             return
 
@@ -1027,7 +1131,8 @@ class IOMGR:
                 elif argument <= REQUESTS[request_id][arg]:
                     break
         else:
-            warning = 'invalid argument "%s"; request ignored' % argument
+            warning = ('IOMGR.process_request: invalid argument "%s"; '
+                       'request ignored' % argument)
             cls.queue_message(WARNING, warning)
             return
 
@@ -1035,8 +1140,8 @@ class IOMGR:
         # channel_name, channel, request_id, method, and argument all contain
         # valid data.
 
-        LOG.debug('validated [%s %s %s]'
-                  % (channel_name, request_id, argument))
+        LOG.debug('IOMGR.process_request: validated [%s %s %s]', channel_name,
+                  request_id, argument)
 
         # Execute the request immediately if it does not require physical
         # hardware I/O (e.g., alias, change, interval).  These requests execute
@@ -1051,13 +1156,13 @@ class IOMGR:
 
         if hasattr(Channel, request_id):  # No I/O is required:
             method(argument)
-            LOG.debug('executed [%s %s %s]'
-                      % (channel_name, request_id, argument))
+            LOG.debug('IOMGR.process_request: executed [%s %s %s]',
+                      channel_name, request_id, argument)
         else:  # Physical hardware I/O is required.
             channel.port.queue_request(channel_name, channel, request_id,
                                        method, argument)
-            LOG.debug('queued to port [%s %s %s]'
-                      % (channel_name, request_id, argument))
+            LOG.debug('IOMGR.process_request: queued to port [%s %s %s]',
+                      channel_name, request_id, argument)
 
 
 ###############################################################################
@@ -1065,6 +1170,10 @@ class IOMGR:
 # IOMGR main program
 #
 ###############################################################################
+
+"""
+****************************** needs work *************************************
+"""
 
 if __name__ == '__main__':
     AL.parser.add_argument('port_names', nargs='+',

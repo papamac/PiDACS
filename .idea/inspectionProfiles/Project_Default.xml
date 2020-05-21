@@ -22,6 +22,7 @@
           <option value="int.isnumeric" />
           <option value="iomgr.RPi" />
           <option value="i2cbus.smbus" />
+          <option value="iomgr.Channel._direction" />
         </list>
       </option>
     </inspection_tool>
