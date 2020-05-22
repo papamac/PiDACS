@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
  PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
   MODULE:  pidacs-c.py
@@ -11,8 +10,8 @@ FUNCTION:  pidacs-c is a remote, interactive client program for the PiDACS
            the argsandlogs module augmented by the code below.  It is
            compatible with Python 2.7.16 and all versions of Python 3.x.
   AUTHOR:  papamac
- VERSION:  1.0.5
-    DATE:  April 22, 2020
+ VERSION:  1.0.6
+    DATE:  May 22, 2020
 
 
 MIT LICENSE:
@@ -47,9 +46,10 @@ DEPENDENCIES/LIMITATIONS:
 ****************************** needs work *************************************
 
 """
+
 __author__ = 'papamac'
-__version__ = '1.0.4'
-__date__ = 'April 7, 2020'
+__version__ = '1.0.6'
+__date__ = 'May 7, 2020'
 
 
 from socket import gethostname

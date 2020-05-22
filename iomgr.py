@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
  PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
   MODULE:  iomgr.py
@@ -343,6 +342,7 @@ class Channel:
     """
     **************************** needs work ***********************************
     """
+
     channels = {}
 
     # Private methods:
@@ -423,6 +423,7 @@ class BCM283X(Port):
     """
     **************************** needs work ***********************************
     """
+
     _CHANNEL_NAMES = [['gp17', 'gp18', 'gp22', 'gp23', 'gp24', 'gp25', 'gp27'],
                       ['gp05', 'gp06', 'gp12', 'gp13', 'gp16', 'gp19', 'gp20',
                        'gp21', 'gp26']]
@@ -446,6 +447,7 @@ class BCM283X(Port):
         """
         ************************** needs work *********************************
         """
+
         # Private methods:
 
         def __init__(self, port, name):
