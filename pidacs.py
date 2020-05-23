@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
  PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
   MODULE:  pidacs.py
@@ -13,8 +14,8 @@ FUNCTION:  pidacs is a versatile server program for the PiDACS input/output
            be executed as a daemon by using the old_pidacsd shell script.  It
            is compatible with Python 2.7.16 and all versions of Python 3.x.
   AUTHOR:  papamac
- VERSION:  1.0.8
-    DATE:  May 22, 2020
+ VERSION:  1.0.9
+    DATE:  May 23, 2020
 
 
 MIT LICENSE:
@@ -51,8 +52,8 @@ DEPENDENCIES/LIMITATIONS:
 """
 
 __author__ = 'papamac'
-__version__ = '1.0.8'
-__date__ = 'May 22, 2020'
+__version__ = '1.0.9'
+__date__ = 'May 23, 2020'
 
 
 from os import fork

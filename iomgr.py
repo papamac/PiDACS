@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
  PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
   MODULE:  iomgr.py
@@ -10,8 +11,8 @@ FUNCTION:  iomgr provides classes and methods to perform input and output
            executed from the command line for testing purposes.  It is
            compatible with Python 2.7.16 and all versions of Python 3.x.
   AUTHOR:  papamac
- VERSION:  1.1.2
-    DATE:  May 22, 2020
+ VERSION:  1.1.3
+    DATE:  May 23, 2020
 
 
 MIT LICENSE:
@@ -86,8 +87,8 @@ DEPENDENCIES/LIMITATIONS:
 """
 
 __author__ = 'papamac'
-__version__ = '1.1.2'
-__date__ = 'May 22, 2020'
+__version__ = '1.1.3'
+__date__ = 'May 23, 2020'
 
 from datetime import datetime
 from logging import DEBUG, INFO, WARNING, ERROR
