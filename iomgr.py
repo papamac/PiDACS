@@ -11,8 +11,8 @@ FUNCTION:  iomgr provides classes and methods to perform input and output
            executed from the command line for testing purposes.  It is
            compatible with Python 2.7.16 and all versions of Python 3.x.
   AUTHOR:  papamac
- VERSION:  1.1.3
-    DATE:  May 23, 2020
+ VERSION:  1.1.4
+    DATE:  May 27, 2020
 
 
 MIT LICENSE:
@@ -87,8 +87,8 @@ DEPENDENCIES/LIMITATIONS:
 """
 
 __author__ = 'papamac'
-__version__ = '1.1.3'
-__date__ = 'May 23, 2020'
+__version__ = '1.1.4'
+__date__ = 'May 27, 2020'
 
 from datetime import datetime
 from logging import DEBUG, INFO, WARNING, ERROR
@@ -159,10 +159,12 @@ RESOLUTION = 12             # ADC resolution is 12, 14, 16, or 18 bits.
 #                             DEFAULT is 12 bits.
 GAIN = 1                    # ADC gain is 1, 2, 4, or 8.
 #                             DEFAULT is 1.
-SCALING = 1.0               # The ADC scaling factor can be any real number
+SCALING = (10.0 + 6.8)/6.8  # The ADC scaling factor can be any real number
 #                             providing appropriate scaling for the sensor
 #                             circuit being measured by an individual analog
-#                             channel.  DEFAULT is 1.0.
+#                             channel.  DEFAULT is 2.4706, the value needed for
+#                             voltage measurements on the AB Electronics ADC Pi
+#                             board.
 
 # Options and DEFAULT values for change detection and interval reporting:
 
@@ -514,7 +516,8 @@ class BCM283X(Port):
         def reset(self, *args):
             LOG.threaddebug('BCM283X._Channel._init called "%s"', self.id)
             self._reset()
-            self.pwm(STOP)
+            if self._pwm:
+                self.pwm(STOP)
             self._init()
 
         # Public pwm methods: dutycycle, frequency, pwm
@@ -552,6 +555,7 @@ class BCM283X(Port):
                         self._pwm = None
                         self.change_ = self._save_change
                         self.interval_ = self._save_interval
+                self._update(operation)  # Report pwm state.
 
         # Public digital I/O methods: read_hw, read, write, momentary
 
@@ -561,8 +565,7 @@ class BCM283X(Port):
 
         def read(self, *args):
             LOG.threaddebug('BCM283X._Channel.read called "%s"', self.id)
-            value = self.read_hw()
-            self._update(value)
+            self._update(self.read_hw())
 
         def write(self, bitval):
             LOG.threaddebug('BCM283X._Channel.write called "%s"', self.id)
@@ -790,8 +793,7 @@ class MCP230XX(Port):
 
         def read(self, *args):
             LOG.threaddebug('MCP230XX._Channel.read called "%s"', self.id)
-            value = self.read_hw()
-            self._update(value)
+            self._update(self.read_hw())
 
         def write(self, bitval):
             LOG.threaddebug('MCP230XX._Channel.write called "%s"', self.id)
