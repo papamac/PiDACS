@@ -11,8 +11,8 @@ FUNCTION:  iomgr provides classes and methods to perform input and output
            executed from the command line for testing purposes.  It is
            compatible with Python 2.7.16 and all versions of Python 3.x.
   AUTHOR:  papamac
- VERSION:  1.1.4
-    DATE:  May 27, 2020
+ VERSION:  1.1.5
+    DATE:  May 30, 2020
 
 
 MIT LICENSE:
@@ -162,9 +162,9 @@ GAIN = 1                    # ADC gain is 1, 2, 4, or 8.
 SCALING = (10.0 + 6.8)/6.8  # The ADC scaling factor can be any real number
 #                             providing appropriate scaling for the sensor
 #                             circuit being measured by an individual analog
-#                             channel.  DEFAULT is 2.4706, the value needed for
-#                             voltage measurements on the AB Electronics ADC Pi
-#                             board.
+#                             channel.  DEFAULT is 2.47058824, the value needed
+#                             for voltage measurements on the AB Electronics
+#                             ADC Pi board.
 
 # Options and DEFAULT values for change detection and interval reporting:
 
@@ -217,13 +217,14 @@ REQUESTS = {'alias':       {'*':        None},
             'momentary':   {'DEFAULT':  MOMENTARY,   '<=':       5},
             'polarity':    {'DEFAULT':  POLARITY,    'normal':   NORMAL,
                             'inverted': INVERTED,    '0':        0,
-                            '1': 1},
+                            '1':        1},
             'pullup':      {'DEFAULT':  PULLUP,      'off':      OFF,
                             'on':       ON,          'down':     DOWN,
                             'up':       UP,          '0':        0,
                             '1':        1,           '2':        2},
             'pwm':         {'DEFAULT':  OPERATION,   'start':    START,
-                            'stop':     STOP,        '1':        1,
+                            'stop':     STOP,        'on':       ON,
+                            'off':      OFF,         '1':        1,
                             '0':        0},
             'read':        {'DEFAULT':  None},
             'reset':       {'DEFAULT':  None},
