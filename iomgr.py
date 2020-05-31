@@ -12,7 +12,7 @@ FUNCTION:  iomgr provides classes and methods to perform input and output
            compatible with Python 2.7.16 and all versions of Python 3.x.
   AUTHOR:  papamac
  VERSION:  1.1.5
-    DATE:  May 30, 2020
+    DATE:  May 31, 2020
 
 
 MIT LICENSE:
@@ -87,8 +87,8 @@ DEPENDENCIES/LIMITATIONS:
 """
 
 __author__ = 'papamac'
-__version__ = '1.1.4'
-__date__ = 'May 27, 2020'
+__version__ = '1.1.5'
+__date__ = 'May 31, 2020'
 
 from datetime import datetime
 from logging import DEBUG, INFO, WARNING, ERROR
@@ -165,6 +165,8 @@ SCALING = (10.0 + 6.8)/6.8  # The ADC scaling factor can be any real number
 #                             channel.  DEFAULT is 2.47058824, the value needed
 #                             for voltage measurements on the AB Electronics
 #                             ADC Pi board.
+UNITS = ''                  # Units for analog channels.  DEFAULT is the null
+#                             string.
 
 # Options and DEFAULT values for change detection and interval reporting:
 
@@ -232,6 +234,7 @@ REQUESTS = {'alias':       {'*':        None},
                             '14':       14,          '16':       16,
                             '18':       18},
             'scaling':     {'DEFAULT':  SCALING,     '#':        None},
+            'units':       {'DEFAULT':  UNITS,       '*':        None},
             'write':       {'DEFAULT':  WRITE,       'off':      OFF,
                             'on':       ON,          'false':    FALSE,
                             'true':     TRUE,        '<=':       5}}
@@ -278,10 +281,12 @@ class Port(Thread):
                 channel.prior_value = channel.value
                 channel.value = value
                 if channel.change_ and self._value_changed(channel):
-                    IOMGR.queue_message(DATA, channel.id, channel.value)
+                    IOMGR.queue_message(DATA, channel.id, channel.value,
+                                        channel.units_)
                 interval = (dt_now - channel.prior_report).total_seconds()
                 if channel.interval_ and interval >= channel.interval_:
-                    IOMGR.queue_message(DATA, channel.id, channel.value)
+                    IOMGR.queue_message(DATA, channel.id, channel.value,
+                                        channel.units_)
                     channel.prior_report = dt_now
 
     def _value_changed(self, channel):
@@ -355,7 +360,7 @@ class Channel:
         LOG.threaddebug('Channel.__init__ called "%s"', name)
         self.port = port
         self._name = name
-        self.id = self.change_ = self.interval_ = None
+        self.id = self.change_ = self.interval_ = self.units_ = None
         self.prior_report = self.prior_value = self.value = None
         self.__init()
 
@@ -364,6 +369,7 @@ class Channel:
         self.id = self._name
         self.change_ = CHANGE
         self.interval_ = INTERVAL
+        self.units_ = UNITS
         self.prior_report = datetime.now()
         self.prior_value = None
         self.value = None
@@ -399,7 +405,7 @@ class Channel:
         LOG.threaddebug('Channel._update called "%s"', self.id)
         self.prior_value = self.value
         self.value = value
-        IOMGR.queue_message(DATA, self.id, value)
+        IOMGR.queue_message(DATA, self.id, value, self.units_)
 
     # Public methods:
 
@@ -415,6 +421,10 @@ class Channel:
     def interval(self, interval):
         LOG.threaddebug('Channel.interval called "%s"', self.id)
         self.interval_ = interval
+
+    def units(self, units):
+        LOG.threaddebug('Channel.units called "%s"', self.id)
+        self.units_ = units
 
 
 ###############################################################################
