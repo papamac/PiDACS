@@ -23,6 +23,7 @@
           <option value="iomgr.RPi" />
           <option value="i2cbus.smbus" />
           <option value="iomgr.Channel._direction" />
+          <option value="iomgr.Channel.read_" />
         </list>
       </option>
     </inspection_tool>

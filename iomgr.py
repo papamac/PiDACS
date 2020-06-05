@@ -11,8 +11,8 @@ FUNCTION:  iomgr provides classes and methods to perform input and output
            executed from the command line for testing purposes.  It is
            compatible with Python 2.7.16 and all versions of Python 3.x.
   AUTHOR:  papamac
- VERSION:  1.1.5
-    DATE:  May 31, 2020
+ VERSION:  1.2.0
+    DATE:  June 4, 2020
 
 
 MIT LICENSE:
@@ -87,8 +87,8 @@ DEPENDENCIES/LIMITATIONS:
 """
 
 __author__ = 'papamac'
-__version__ = '1.1.5'
-__date__ = 'May 31, 2020'
+__version__ = '1.2.0'
+__date__ = 'June 4, 2020'
 
 from datetime import datetime
 from logging import DEBUG, INFO, WARNING, ERROR
@@ -264,34 +264,21 @@ class Port(Thread):
         self._queue = Queue()  # Request queue for this Port instance.
         self._running = False
 
-    def _poll(self, dt_now):
+    def _poll_channels(self):
         # LOG.threaddebug('Port._poll called "%s"', self.name)
         for channel in self._channels:
             if channel.change_ or channel.interval_:
                 try:
-                    value = channel.read_hw()
+                    value = channel.read_()
                 except OSError as err:
+                    channel.update(u'!ERROR')
                     self._running = False
                     err_msg = ('Port._poll: read error %s on channel "%s" %s; '
                                'port "%s" stopped' % (err.errno, channel.id,
                                                       err.strerror, self.name))
                     IOMGR.queue_message(ERROR, err_msg)
-                    IOMGR.queue_message(DATA, '%s !ERROR' % channel.id)
-                    value = '!ERROR'
-                channel.prior_value = channel.value
-                channel.value = value
-                if channel.change_ and self._value_changed(channel):
-                    IOMGR.queue_message(DATA, channel.id, channel.value,
-                                        channel.units_)
-                interval = (dt_now - channel.prior_report).total_seconds()
-                if channel.interval_ and interval >= channel.interval_:
-                    IOMGR.queue_message(DATA, channel.id, channel.value,
-                                        channel.units_)
-                    channel.prior_report = dt_now
-
-    def _value_changed(self, channel):
-        # LOG.threaddebug('Port._value_changed called "%s"', channel.name)
-        return channel.value != channel.prior_value
+                else:
+                    channel.update(value, unconditional_report=False)
 
 # Public methods:
 
@@ -325,16 +312,16 @@ class Port(Thread):
 
             # Perform periodic polling and status functions.
 
-            dt_now = datetime.now()
-            self._poll(dt_now)
+            self._poll_channels()
             poll_count += 1
-            status_int = (dt_now - dt_status).total_seconds()
-            if status_int >= STATUS_INTERVAL:
-                rate = poll_count / status_int
+            now = datetime.now()
+            interval = (now - dt_status).total_seconds()
+            if interval >= STATUS_INTERVAL:
+                rate = poll_count / interval
                 IOMGR.queue_message(DEBUG, 'Port.run: polling "%s" %d per sec'
                                            % (self.name, rate))
                 poll_count = 0
-                dt_status = dt_now
+                dt_status = now
 
     def stop(self):
         LOG.threaddebug('Port.stop called "%s"', self.name)
@@ -401,13 +388,11 @@ class Channel:
             IOMGR.queue_message(WARNING, warning)
         return ok
 
-    def _update(self, value):
-        LOG.threaddebug('Channel._update called "%s"', self.id)
-        self.prior_value = self.value
-        self.value = value
-        IOMGR.queue_message(DATA, self.id, value, self.units_)
+    def _value_changed(self):
+        # LOG.threaddebug('Channel._value_changed called "%s"', self.name)
+        return self.value != self.prior_value
 
-    # Public methods:
+    # Public configuration methods: alias, change, interval, and units.
 
     def alias(self, alias):
         LOG.threaddebug('Channel.alias called "%s"', self.id)
@@ -425,6 +410,24 @@ class Channel:
     def units(self, units):
         LOG.threaddebug('Channel.units called "%s"', self.id)
         self.units_ = units
+
+    # Public I/O methods: read and update.
+
+    def read(self, *args):
+        LOG.threaddebug('Channel.read called "%s"', self.id)
+        self.update(self.read_())
+
+    def update(self, value, unconditional_report=True):
+        # LOG.threaddebug('Channel.update called "%s"', self.id)
+        self.prior_value = self.value
+        self.value = value
+        now = datetime.now()
+        interval = (now - self.prior_report).total_seconds()
+        if (unconditional_report
+                or (self.change_ and self._value_changed())
+                or (self.interval_ and interval >= self.interval_)):
+            IOMGR.queue_message(DATA, self.id, value, self.units_)
+            self.prior_report = now
 
 
 ###############################################################################
@@ -503,11 +506,12 @@ class BCM283X(Port):
                 bitval = 0 if bitval else 1
             return bitval
 
-        def _write_hw(self, bitval):
-            LOG.threaddebug('BCM283X._Channel._write_hw called "%s"', self.id)
+        def _write(self, bitval):
+            LOG.threaddebug('BCM283X._Channel._write called "%s"', self.id)
             gpio.output(self._number, bitval)
 
-        # Public configuration methods: direction, pullup, polarity, reset
+        # Public configuration methods: direction, pullup, polarity, dutycycle,
+        # frequency, and reset.
 
         def direction(self, direction):
             LOG.threaddebug('BCM283X._Channel.direction called "%s"', self.id)
@@ -524,15 +528,6 @@ class BCM283X(Port):
             if self._check_direction(INPUT):
                 self._polarity = polarity
 
-        def reset(self, *args):
-            LOG.threaddebug('BCM283X._Channel._init called "%s"', self.id)
-            self._reset()
-            if self._pwm:
-                self.pwm(STOP)
-            self._init()
-
-        # Public pwm methods: dutycycle, frequency, pwm
-
         def dutycycle(self, dutycycle):
             LOG.threaddebug('BCM283X._Channel.dutycycle called "%s"', self.id)
             if self._check_direction(OUTPUT):
@@ -546,6 +541,41 @@ class BCM283X(Port):
                 self._frequency = frequency
                 if self._pwm:
                     self._pwm.ChangeFrequency(self._frequency)
+
+        def reset(self, *args):
+            LOG.threaddebug('BCM283X._Channel._init called "%s"', self.id)
+            self._reset()
+            if self._pwm:
+                self.pwm(STOP)
+            self._init()
+
+        # Public digital I/O methods: read_, write, momentary, and pwm.
+
+        def read_(self):
+            # LOG.threaddebug('BCM283X._Channel.read_ called "%s"', self.id)
+            return self._apply_polarity(gpio.input(self._number))
+
+        def write(self, bitval):
+            LOG.threaddebug('BCM283X._Channel.write called "%s"', self.id)
+            if self._check_direction(OUTPUT):
+                if self._check_bitval(bitval):
+                    if self._pwm:  # Stop/delete existing pwm, if active.
+                        self._pwm.stop()
+                        del self._pwm
+                        self._pwm = None
+                        self.change_ = self._save_change
+                        self.interval_ = self._save_interval
+                    self._write(bitval)
+                    self.update(bitval)
+
+        def momentary(self, delay):
+            LOG.threaddebug('BCM283X._Channel.momentary called "%s"', self.id)
+            if self._check_direction(OUTPUT):
+                self._write(ON)
+                self.update(ON)
+                sleep(delay)
+                self._write(OFF)
+                self.update(OFF)
 
         def pwm(self, operation):
             LOG.threaddebug('BCM283X._Channel.pwm called "%s"', self.id)
@@ -566,39 +596,7 @@ class BCM283X(Port):
                         self._pwm = None
                         self.change_ = self._save_change
                         self.interval_ = self._save_interval
-                self._update(operation)  # Report pwm state.
-
-        # Public digital I/O methods: read_hw, read, write, momentary
-
-        def read_hw(self):
-            # LOG.threaddebug('BCM283X._Channel.read_hw called "%s"', self.id)
-            return self._apply_polarity(gpio.input(self._number))
-
-        def read(self, *args):
-            LOG.threaddebug('BCM283X._Channel.read called "%s"', self.id)
-            self._update(self.read_hw())
-
-        def write(self, bitval):
-            LOG.threaddebug('BCM283X._Channel.write called "%s"', self.id)
-            if self._check_direction(OUTPUT):
-                if self._check_bitval(bitval):
-                    if self._pwm:  # Stop/delete existing pwm, if active.
-                        self._pwm.stop()
-                        del self._pwm
-                        self._pwm = None
-                        self.change_ = self._save_change
-                        self.interval_ = self._save_interval
-                    self._write_hw(bitval)
-                    self._update(bitval)
-
-        def momentary(self, delay):
-            LOG.threaddebug('BCM283X._Channel.momentary called "%s"', self.id)
-            if self._check_direction(OUTPUT):
-                self._write_hw(ON)
-                self._update(ON)
-                sleep(delay)
-                self._write_hw(OFF)
-                self._update(OFF)
+                self.update(operation)  # Report pwm state.
 
 
 ###############################################################################
@@ -655,39 +653,28 @@ class MCP230XX(Port):
             self._channels.append(channel)
             Channel.channels[channel_name] = channel
 
-    def _poll(self, dt_now):  # Replaces superclass method.
+    def _poll_channels(self):  # Replaces superclass method.
         # LOG.threaddebug('MCP230XX._poll called "%s"', self.name)
         for channel in self._channels:
             if channel.change_ or channel.interval_:
                 break
+        else:
             return  # Return if no I/O required.
-        good_gpio_read = True
+
         try:
             self.gpio.read()
-            changes = self.gpio.value ^ self.gpio.prior_value
         except OSError as err:
+            for channel in self._channels:
+                channel.update(u'!ERROR')
             self._running = False
-            good_gpio_read = False
             err_msg = ('MCP230XX._poll: polling read error %s on port '
                        '"%s" %s; port stopped' % (err.errno, self.name,
                                                   err.strerror))
             IOMGR.queue_message(ERROR, err_msg)
-            changes = 0xff
-        for channel in self._channels:
-            mask = 1 << channel.number
-            if good_gpio_read:  # gpio register read was good.
-                bitval = 1 if self.gpio.value & mask else 0
-            else:  # gpio register read error.
-                bitval = '!ERROR'
-                IOMGR.queue_message(DATA, '%s !ERROR' % channel.id)
-            channel.prior_value = channel.value
-            channel.value = bitval
-            if channel.change_ and changes & mask:
-                IOMGR.queue_message(DATA, channel.id, bitval)
-            interval = (dt_now - channel.prior_report).total_seconds()
-            if channel.interval_ and interval >= channel.interval_:
-                IOMGR.queue_message(DATA, channel.id, bitval)
-                channel.prior_report = dt_now
+        else:
+            for channel in self._channels:
+                bitval = 1 if self.gpio.value & (1 << channel.number) else 0
+                channel.update(bitval, unconditional_report=False)
 
     class _Register:
         """
@@ -706,7 +693,8 @@ class MCP230XX(Port):
             self.read()
 
         def read(self):
-            LOG.threaddebug('MCP230XX._Register.read called "%s"', self._name)
+            # LOG.threaddebug('MCP230XX._Register.read called "%s"',
+            # self._name)
             self.prior_value = self.value
             self.value = i2cbus.read_byte_data(self._i2c_address,
                                                self._reg_address)
@@ -768,11 +756,11 @@ class MCP230XX(Port):
             self.pullup(PULLUP)
             self.read()
 
-        def _write_hw(self, bitval):
-            LOG.threaddebug('MCP230XX._Channel._write_hw called "%s"', self.id)
+        def _write(self, bitval):
+            LOG.threaddebug('MCP230XX._Channel._write called "%s"', self.id)
             self._port.gpio.update(self.number, bitval)
 
-        # Public configuration methods: direction, pullup, polarity, reset
+        # Public configuration methods: direction, pullup, polarity, and reset.
 
         def direction(self, direction):
             LOG.threaddebug('MCP230XX._Channel.direction called "%s"', self.id)
@@ -795,32 +783,28 @@ class MCP230XX(Port):
             self._reset()
             self._init()
 
-        # Public digital I/O methods: read_hw, read, write, momentary
+        # Public digital I/O methods: read_, write, and momentary.
 
-        def read_hw(self):
-            # LOG.threaddebug('MCP230XX._Channel.read_hw called "%s"', self.id)
+        def read_(self):
+            # LOG.threaddebug('MCP230XX._Channel.read_ called "%s"', self.id)
             bitval = 1 if self._port.gpio.read() & (1 << self.number) else 0
             return bitval
-
-        def read(self, *args):
-            LOG.threaddebug('MCP230XX._Channel.read called "%s"', self.id)
-            self._update(self.read_hw())
 
         def write(self, bitval):
             LOG.threaddebug('MCP230XX._Channel.write called "%s"', self.id)
             if self._check_direction(OUTPUT):
                 if self._check_bitval(bitval):
-                    self._write_hw(bitval)
-                    self._update(bitval)
+                    self._write(bitval)
+                    self.update(bitval)
 
         def momentary(self, delay):
             LOG.threaddebug('MCP230XX._Channel.momentary called "%s"', self.id)
             if self._check_direction(OUTPUT):
-                self._write_hw(ON)
-                self._update(ON)
+                self._write(ON)
+                self.update(ON)
                 sleep(delay)
-                self._write_hw(OFF)
-                self._update(OFF)
+                self._write(OFF)
+                self.update(OFF)
 
 
 ###############################################################################
@@ -845,18 +829,6 @@ class MCP342X(Port):
             channel = self._Channel(self, channel_name)
             self._channels.append(channel)
             Channel.channels[channel_name] = channel
-
-    def _value_changed(self, channel):  # Replaces superclass method.
-        # LOG.threaddebug('MCP342X._value_changed called "%s"', channel)
-        pval = channel.prior_value
-        val = channel.value
-        if val == '!ERROR':
-            return True
-        changed = False
-        if pval:
-            change = 100.0 * fabs(val - pval) / pval
-            changed = change > channel.change_
-        return changed
 
     class _Channel(Channel):
         """
@@ -894,7 +866,20 @@ class MCP342X(Port):
             lsb_value = 4.096 / 2 ** self._resolution
             self._multiplier = self._scaling * lsb_value / self._gain
 
-        # Public configuration methods: gain, resolution, scaling, reset
+        def _value_changed(self):  # Replaces superclass method.
+            # LOG.threaddebug('MCP342X._Channel._value_changed called "%s"',
+            # self.id)
+            pval = self.prior_value
+            val = self.value
+            if val == '!ERROR':
+                return True
+            changed = False
+            if pval:
+                change = 100.0 * fabs(val - pval) / pval
+                changed = change > self.change_
+            return changed
+
+        # Public configuration methods: gain, resolution, scaling, and reset.
 
         def gain(self, gain):
             LOG.threaddebug('MCP342X._Channel.gain called "%s"', self.id)
@@ -916,10 +901,10 @@ class MCP342X(Port):
             self._reset()
             self._init()
 
-        # Public analog input methods: read_hw, read
+        # Public analog input method: read_.
 
-        def read_hw(self):
-            # LOG.threaddebug('MCP342X._Channel.read_hw called "%s"', self.id)
+        def read_(self):
+            # LOG.threaddebug('MCP342X._Channel.read_ called "%s"', self.id)
             i2cbus.write_byte(self._i2c_address, self._config)
             config = self._config & 0x7F
             while True:
@@ -929,10 +914,6 @@ class MCP342X(Port):
                     break
             counts = int.from_bytes(bytes_[:-1], byteorder='big', signed=True)
             return counts * self._multiplier
-
-        def read(self, *args):
-            LOG.threaddebug('MCP342X._Channel.read called "%s"', self.id)
-            self._update(self.read_hw())
 
 
 ###############################################################################
@@ -1151,33 +1132,10 @@ class IOMGR:
             cls.queue_message(WARNING, warning)
             return
 
-        # Valid request; all checks are complete and the variables
-        # channel_name, channel, request_id, method, and argument all contain
-        # valid data.
+        # Valid request; queue it to the appropriate port.
 
-        LOG.debug('IOMGR.process_request: validated [%s %s %s]', channel_name,
-                  request_id, argument)
-
-        # Execute the request immediately if it does not require physical
-        # hardware I/O (e.g., alias, change, interval).  These requests execute
-        # quickly and will not delay sequential request processing with I/O
-        # waits.  Immediate execution of alias requests also ensures that
-        # subsequent requests for an aliased channel are recognized.
-
-        # If the request may incur I/O delays, queue it to the appropriate port
-        # thread for concurrent execution.  I/O requests will be executed in
-        # sequence on each port, but will not delay requests queued to other
-        # ports unless there is I/O bus contention.
-
-        if hasattr(Channel, request_id):  # No I/O is required:
-            method(argument)
-            LOG.debug('IOMGR.process_request: executed [%s %s %s]',
-                      channel_name, request_id, argument)
-        else:  # Physical hardware I/O is required.
-            channel.port.queue_request(channel_name, channel, request_id,
-                                       method, argument)
-            LOG.debug('IOMGR.process_request: queued to port [%s %s %s]',
-                      channel_name, request_id, argument)
+        channel.port.queue_request(channel_name, channel, request_id,
+                                   method, argument)
 
 
 ###############################################################################
