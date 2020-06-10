@@ -3,16 +3,16 @@
  PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
   MODULE:  iomgr.py
    TITLE:  PiDACS input/output manager (iomgr)
-FUNCTION:  iomgr provides classes and methods to perform input and output
+FUNCTION:  iomgr.py provides classes and methods to perform input and output
            operations for a variety of data acquisition and control devices on
            a Raspberry Pi.
-   USAGE:  iomgr is imported and used within main programs (e.g., pidacs).
+   USAGE:  iomgr.py is imported and used within main programs (e.g., pidacs).
            The module also includes an interactive main program that can be
            executed from the command line for testing purposes.  It is
            compatible with Python 2.7.16 and all versions of Python 3.x.
   AUTHOR:  papamac
- VERSION:  1.2.0
-    DATE:  June 4, 2020
+ VERSION:  1.2.1
+    DATE:  June 10, 2020
 
 
 MIT LICENSE:
@@ -87,8 +87,8 @@ DEPENDENCIES/LIMITATIONS:
 """
 
 __author__ = 'papamac'
-__version__ = '1.2.0'
-__date__ = 'June 4, 2020'
+__version__ = '1.2.1'
+__date__ = 'June 10, 2020'
 
 from datetime import datetime
 from logging import DEBUG, INFO, WARNING, ERROR
@@ -97,8 +97,8 @@ from queue import Queue, Empty
 from threading import Thread
 from time import sleep
 
-from i2cbus import i2cbus
-import RPi.GPIO as gpio
+from i2cbus import I2CBUS
+from RPi import GPIO
 
 from papamaclib.argsandlogs import AL
 from papamaclib.colortext import getLogger, DATA
@@ -449,8 +449,8 @@ class BCM283X(Port):
         LOG.threaddebug('BCM283X.__init__ called "%s"', name)
         Port.__init__(self, name)
 
-        gpio.setmode(gpio.BCM)
-        gpio.setwarnings(False)
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setwarnings(False)
 
         # Instantiate channels.
 
@@ -492,10 +492,10 @@ class BCM283X(Port):
 
         def _configure(self, direction, pullup):
             LOG.threaddebug('BCM283X._Channel._configure called "%s"', self.id)
-            gppu = (gpio.PUD_OFF if pullup is OFF
-                    else gpio.PUD_UP if pullup is UP
-                    else gpio.PUD_DOWN)
-            gpio.setup(self._number, direction, gppu)
+            gppu = (GPIO.PUD_OFF if pullup is OFF
+                    else GPIO.PUD_UP if pullup is UP
+                    else GPIO.PUD_DOWN)
+            GPIO.setup(self._number, direction, gppu)
             self._direction = direction
             self._pullup = pullup
 
@@ -508,7 +508,7 @@ class BCM283X(Port):
 
         def _write(self, bitval):
             LOG.threaddebug('BCM283X._Channel._write called "%s"', self.id)
-            gpio.output(self._number, bitval)
+            GPIO.output(self._number, bitval)
 
         # Public configuration methods: direction, pullup, polarity, dutycycle,
         # frequency, and reset.
@@ -553,7 +553,7 @@ class BCM283X(Port):
 
         def read_(self):
             # LOG.threaddebug('BCM283X._Channel.read_ called "%s"', self.id)
-            return self._apply_polarity(gpio.input(self._number))
+            return self._apply_polarity(GPIO.input(self._number))
 
         def write(self, bitval):
             LOG.threaddebug('BCM283X._Channel.write called "%s"', self.id)
@@ -587,7 +587,7 @@ class BCM283X(Port):
                     self._save_change = self.change_
                     self._save_interval = self.interval_
                     self.change_ = self.interval_ = NONE
-                    self._pwm = gpio.PWM(self._number, self._frequency)
+                    self._pwm = GPIO.PWM(self._number, self._frequency)
                     self._pwm.start(self._dutycycle)
                 else:  # operation is STOP.
                     if self._pwm:  # Stop/delete existing pwm, if active.
@@ -696,13 +696,13 @@ class MCP230XX(Port):
             # LOG.threaddebug('MCP230XX._Register.read called "%s"',
             # self._name)
             self.prior_value = self.value
-            self.value = i2cbus.read_byte_data(self._i2c_address,
+            self.value = I2CBUS.read_byte_data(self._i2c_address,
                                                self._reg_address)
             return self.value
 
         def write(self, value):
             LOG.threaddebug('MCP230XX._Register.write called "%s"', self._name)
-            i2cbus.write_byte_data(self._i2c_address, self._reg_address, value)
+            I2CBUS.write_byte_data(self._i2c_address, self._reg_address, value)
             self.prior_value = self.value
             self.value = value
 
@@ -905,10 +905,10 @@ class MCP342X(Port):
 
         def read_(self):
             # LOG.threaddebug('MCP342X._Channel.read_ called "%s"', self.id)
-            i2cbus.write_byte(self._i2c_address, self._config)
+            I2CBUS.write_byte(self._i2c_address, self._config)
             config = self._config & 0x7F
             while True:
-                bytes_ = i2cbus.read_i2c_block_data(self._i2c_address, config,
+                bytes_ = I2CBUS.read_i2c_block_data(self._i2c_address, config,
                                                     self._num_bytes)
                 if bytes_[-1] < 128:
                     break
@@ -1022,7 +1022,7 @@ class IOMGR:
         for port in Port.ports:
             port.stop()
         if cls._gpio_cleanup:
-            gpio.cleanup()
+            GPIO.cleanup()
 
     @classmethod
     def get_message(cls):

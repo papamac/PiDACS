@@ -1,5 +1,19 @@
 """
-MIT LICENSE
+ PACKAGE:  Raspberry Pi Data Acquisition and Control System (PiDACS)
+  MODULE:  i2cbus.py
+   TITLE:  Inter-Integrated Circuit Bus (i2cbus.py)
+FUNCTION:  i2cbus.py instantiates an SMBus object for the particular Raspberry
+           Pi revision being used
+   USAGE:  i2cbus.py is imported by main programs.  After import, the global
+           variable I2CBUS contains the correct SMBus instance.  This is
+           normally done using the statement:
+           from i2cbus import I2Cbus
+  AUTHOR:  papamac
+ VERSION:  1.0.2
+    DATE:  June 10, 2020
+
+
+MIT LICENSE:
 
 Copyright (c) 2018-2020 David A. Krause, aka papamac
 
@@ -21,12 +35,15 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-DESCRIPTION
+
+DESCRIPTION:
+
+****************************** needs work *************************************
 
 """
 __author__ = 'papamac'
-__version__ = '1.0.1'
-__date__ = 'March 19, 2020'
+__version__ = '1.0.2'
+__date__ = 'June 10, 2020'
 
 from smbus import SMBus
 
@@ -43,4 +60,4 @@ def _get_i2c_revision():
     return 0 if _get_raspberry_pi_revision() in ('0002', '0003') else 1
 
 
-i2cbus = SMBus(_get_i2c_revision())
+I2CBUS = SMBus(_get_i2c_revision())
